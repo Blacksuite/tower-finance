@@ -1,0 +1,9 @@
+services:
+  tower-finance:
+    build: .
+    container_name: tower-finance
+    ports:
+      - "3210:3210"
+    volumes:
+      - ./data:/app/data
+    restart: unless-stopped

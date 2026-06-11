@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "tower-finance",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["dist/server/index.js"],
+      "port": 3210
+    }
+  ]
+}

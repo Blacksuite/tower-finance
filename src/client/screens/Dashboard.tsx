@@ -1,0 +1,126 @@
+import { useMemo, useState } from 'react';
+import {
+  budgetVsActualYtd,
+  monthAxis,
+  monthlySummary,
+  netWorthSeries,
+  rangeMonths,
+  summarize,
+  topCategories,
+  type DashboardRange,
+} from '../../shared/calc';
+import { currentMonthISO, fmtPct } from '../../shared/format';
+import { useAppData } from '../api/data';
+import { BudgetBars, CategoryBars } from '../components/BudgetBars';
+import { Ribbon } from '../components/Ribbon';
+import {
+  AllocationChart,
+  CashFlowChart,
+  NetWorthChart,
+  RateChart,
+  type MonthDatum,
+} from '../components/charts';
+import { AnimatedAmount, CardSkeleton, Section, Segmented } from '../components/ui/primitives';
+import { useChartColors, useTheme } from '../theme/theme';
+
+const RANGE_OPTIONS: { value: DashboardRange; label: string }[] = [
+  { value: 'month', label: 'This month' },
+  { value: 'ytd', label: 'YTD' },
+  { value: 'all', label: 'All time' },
+];
+
+export function Dashboard() {
+  const { data, isLoading } = useAppData();
+  const { resolved } = useTheme();
+  const colors = useChartColors(resolved);
+  const [range, setRange] = useState<DashboardRange>('month');
+  const currentMonth = currentMonthISO();
+
+  const derived = useMemo(() => {
+    if (!data) return null;
+    const months = rangeMonths(data, range, currentMonth);
+    const summary = summarize(data, months);
+    const axis = monthAxis(data, currentMonth).filter((m) => m <= currentMonth);
+    const series: MonthDatum[] = axis.map((m) => ({ month: m, ...monthlySummary(data, m) }));
+    return {
+      summary,
+      series,
+      netWorth: netWorthSeries(data, currentMonth),
+      top: topCategories(data, months),
+      budgetYtd: budgetVsActualYtd(data, currentMonth),
+    };
+  }, [data, range, currentMonth]);
+
+  if (isLoading || !derived) {
+    return (
+      <div className="stack">
+        <CardSkeleton lines={4} />
+        <div className="stat-grid">
+          {Array.from({ length: 6 }, (_, i) => (
+            <CardSkeleton key={i} lines={1} />
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  const { summary, series, netWorth, top, budgetYtd } = derived;
+
+  const stats: { label: string; value: number; cls?: string; format?: (n: number) => string }[] = [
+    { label: 'Total income', value: summary.income, cls: 'amount--income' },
+    { label: 'Total expenses', value: summary.expenses, cls: 'amount--expense' },
+    { label: 'Total savings', value: summary.saved, cls: 'amount--saving' },
+    { label: 'Total investments', value: summary.invested, cls: 'amount--investment' },
+    { label: 'Net cash flow', value: summary.income - summary.expenses },
+    { label: 'Savings rate', value: summary.savingsRate, format: fmtPct },
+  ];
+
+  return (
+    <div className="stack">
+      <div className="screen-head">
+        <h1 className="screen-title">Dashboard</h1>
+        <Segmented value={range} onChange={setRange} options={RANGE_OPTIONS} ariaLabel="Dashboard range" />
+      </div>
+
+      <Ribbon summary={summary} />
+
+      <div className="stat-grid">
+        {stats.map((s) => (
+          <div key={s.label} className="card stat-card">
+            <span className="label">{s.label}</span>
+            <AnimatedAmount value={s.value} format={s.format} className={`amount ${s.cls ?? ''}`} />
+          </div>
+        ))}
+      </div>
+
+      <div className="chart-grid">
+        <Section title="Monthly cash flow">
+          <div className="chart-card__body">
+            <CashFlowChart data={series} colors={colors} />
+          </div>
+        </Section>
+        <Section title="Income allocation">
+          <div className="chart-card__body">
+            <AllocationChart data={series} colors={colors} />
+          </div>
+        </Section>
+        <Section title="Savings rate trend">
+          <div className="chart-card__body">
+            <RateChart data={series} colors={colors} />
+          </div>
+        </Section>
+        <Section title="Net worth growth">
+          <div className="chart-card__body">
+            <NetWorthChart data={netWorth} colors={colors} />
+          </div>
+        </Section>
+        <Section title="Top spending categories">
+          <CategoryBars items={top} />
+        </Section>
+        <Section title="Budget vs actual · YTD">
+          <BudgetBars rows={budgetYtd} />
+        </Section>
+      </div>
+    </div>
+  );
+}

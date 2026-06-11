@@ -1,0 +1,83 @@
+/* Design tokens — Tower Finance.
+   Surfaces are calm neutrals; semantic color appears only on numbers, chart
+   marks, small accents and progress. Depth via hairlines + surface steps. */
+
+:root {
+  /* type scale: 12 / 14 / 16 / 20 / 28 / 40, spacing on a 4px grid */
+  --text-xs: 12px;
+  --text-sm: 14px;
+  --text-md: 16px;
+  --text-lg: 20px;
+  --text-xl: 28px;
+  --text-2xl: 40px;
+
+  --font-display: 'Space Grotesk', 'Inter', system-ui, sans-serif;
+  --font-body: 'Inter', system-ui, -apple-system, sans-serif;
+
+  --radius-card: 16px;
+  --radius-input: 10px;
+  --radius-pill: 999px;
+
+  --dur: 200ms;
+  --dur-slow: 350ms;
+  --ease: cubic-bezier(0.22, 1, 0.36, 1);
+
+  --tabbar-h: 64px;
+}
+
+[data-theme='dark'] {
+  color-scheme: dark;
+  --bg: #0a0a0b;
+  --surface: #141417;
+  --surface-2: #1b1b20;
+  --border: #26262b;
+  --border-strong: #36363e;
+  --text: #fafafa;
+  --muted: #a1a1aa;
+  --faint: #67676f;
+
+  --income: #10b981;
+  --expense: #f43f5e;
+  --saving: #3b82f6;
+  --investment: #8b5cf6;
+  --debt: #f59e0b;
+
+  --income-tint: rgba(16, 185, 129, 0.13);
+  --expense-tint: rgba(244, 63, 94, 0.13);
+  --saving-tint: rgba(59, 130, 246, 0.13);
+  --investment-tint: rgba(139, 92, 246, 0.13);
+  --debt-tint: rgba(245, 158, 11, 0.13);
+  --neutral-tint: rgba(250, 250, 250, 0.07);
+
+  --glow: radial-gradient(60% 120% at 50% -20%, rgba(59, 130, 246, 0.09), transparent 70%);
+  --scrim: rgba(0, 0, 0, 0.6);
+}
+
+[data-theme='light'] {
+  color-scheme: light;
+  --bg: #fafaf9;
+  --surface: #ffffff;
+  --surface-2: #f4f4f3;
+  --border: #e7e5e4;
+  --border-strong: #d6d3d1;
+  --text: #1c1917;
+  --muted: #78716c;
+  --faint: #b0aaa5;
+
+  /* same hues, lightness tuned for contrast on white */
+  --income: #059669;
+  --expense: #e11d48;
+  --saving: #2563eb;
+  --investment: #7c3aed;
+  --debt: #d97706;
+
+  --income-tint: rgba(5, 150, 105, 0.1);
+  --expense-tint: rgba(225, 29, 72, 0.1);
+  --saving-tint: rgba(37, 99, 235, 0.1);
+  --investment-tint: rgba(124, 58, 237, 0.1);
+  --debt-tint: rgba(217, 119, 6, 0.12);
+  --neutral-tint: rgba(28, 25, 23, 0.06);
+
+  --glow: radial-gradient(60% 120% at 50% -20%, rgba(37, 99, 235, 0.07), transparent 70%);
+  --scrim: rgba(28, 25, 23, 0.35);
+}

@@ -1,0 +1,195 @@
+/* App shell: bottom tab bar on mobile, left sidebar on desktop. */
+
+.app {
+  min-height: 100dvh;
+}
+
+.main {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 20px 16px calc(var(--tabbar-h) + 32px + env(safe-area-inset-bottom));
+}
+
+.screen-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.screen-title {
+  font-size: var(--text-lg);
+  letter-spacing: -0.01em;
+}
+
+/* --- mobile tab bar ------------------------------------------------------------ */
+
+.tabbar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 40;
+  display: grid;
+  grid-template-columns: 1fr 1fr 72px 1fr 1fr;
+  align-items: stretch;
+  height: calc(var(--tabbar-h) + env(safe-area-inset-bottom));
+  padding-bottom: env(safe-area-inset-bottom);
+  background: color-mix(in srgb, var(--bg) 86%, transparent);
+  -webkit-backdrop-filter: blur(16px);
+  backdrop-filter: blur(16px);
+  border-top: 1px solid var(--border);
+}
+
+.tabbar__item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  color: var(--faint);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  text-decoration: none;
+  transition: color var(--dur) var(--ease);
+}
+
+.tabbar__item.is-active { color: var(--text); }
+
+.tabbar__fab-slot {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.fab {
+  width: 52px;
+  height: 52px;
+  margin-top: -18px;
+  border-radius: 50%;
+  background: var(--text);
+  color: var(--bg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 4px solid var(--bg);
+  transition: transform var(--dur) var(--ease);
+}
+
+.fab:active { transform: scale(0.92); }
+
+/* --- desktop sidebar -------------------------------------------------------------- */
+
+.sidebar {
+  display: none;
+}
+
+@media (min-width: 1024px) {
+  .app {
+    display: grid;
+    grid-template-columns: 220px 1fr;
+  }
+
+  .tabbar {
+    display: none;
+  }
+
+  .main {
+    padding: 32px 40px 64px;
+  }
+
+  .sidebar {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    position: sticky;
+    top: 0;
+    height: 100dvh;
+    padding: 24px 16px;
+    border-right: 1px solid var(--border);
+  }
+
+  .sidebar__brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 12px 24px;
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: var(--text-md);
+    letter-spacing: -0.01em;
+  }
+
+  .sidebar__brand-mark {
+    width: 26px;
+    height: 26px;
+    border-radius: 7px;
+  }
+
+  .sidebar__item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 9px 12px;
+    border-radius: var(--radius-input);
+    color: var(--muted);
+    font-size: var(--text-sm);
+    font-weight: 500;
+    text-decoration: none;
+    transition: background var(--dur) var(--ease), color var(--dur) var(--ease);
+  }
+
+  .sidebar__item:hover { background: var(--surface-2); color: var(--text); }
+  .sidebar__item.is-active { background: var(--surface-2); color: var(--text); }
+
+  .sidebar__add {
+    margin-top: 16px;
+  }
+
+  .sidebar__foot {
+    margin-top: auto;
+    padding: 0 12px;
+    color: var(--faint);
+    font-size: var(--text-xs);
+  }
+}
+
+/* --- grids ---------------------------------------------------------------------------- */
+
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+}
+
+.chart-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 16px;
+}
+
+@media (min-width: 700px) {
+  .stat-grid { grid-template-columns: repeat(3, 1fr); }
+}
+
+@media (min-width: 1024px) {
+  .stat-grid { grid-template-columns: repeat(6, 1fr); gap: 16px; }
+  .chart-grid { grid-template-columns: 1fr 1fr; }
+}
+
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+@media (min-width: 1024px) {
+  .month-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+    align-items: start;
+  }
+}

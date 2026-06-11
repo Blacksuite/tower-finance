@@ -1,0 +1,7 @@
+node_modules/
+dist/
+data/
+src/client/public/icons/
+*.log
+.DS_Store
+.env

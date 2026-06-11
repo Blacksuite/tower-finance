@@ -1,0 +1,213 @@
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+* {
+  margin: 0;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: var(--text-md);
+  line-height: 1.45;
+  -webkit-font-smoothing: antialiased;
+  overscroll-behavior-y: none;
+}
+
+input,
+button,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+
+button {
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+img,
+svg {
+  display: block;
+}
+
+h1,
+h2,
+h3 {
+  font-family: var(--font-display);
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+:focus-visible {
+  outline: 2px solid var(--saving);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+::selection {
+  background: var(--saving);
+  color: #fff;
+}
+
+/* --- shared typography ----------------------------------------------------- */
+
+/* small, muted, uppercase-tracked labels */
+.label {
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+/* monetary amounts: tabular numerals, heavier than their label */
+.amount {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum';
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+}
+
+.amount--income { color: var(--income); }
+.amount--expense { color: var(--expense); }
+.amount--saving { color: var(--saving); }
+.amount--investment { color: var(--investment); }
+.amount--debt { color: var(--debt); }
+.amount--muted { color: var(--muted); }
+
+.section-title {
+  font-size: var(--text-xs);
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 12px;
+}
+
+/* --- cards ------------------------------------------------------------------ */
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  padding: 20px;
+}
+
+/* --- buttons ------------------------------------------------------------------ */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 0 20px;
+  border-radius: var(--radius-input);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  transition: background var(--dur) var(--ease), opacity var(--dur) var(--ease);
+}
+
+.btn--primary {
+  background: var(--text);
+  color: var(--bg);
+}
+
+.btn--primary:hover { opacity: 0.88; }
+
+.btn--ghost {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text);
+}
+
+.btn--ghost:hover { background: var(--surface-2); }
+
+.btn--danger {
+  background: var(--expense-tint);
+  color: var(--expense);
+}
+
+.btn--sm {
+  min-height: 32px;
+  padding: 0 12px;
+  font-size: var(--text-xs);
+  font-weight: 500;
+}
+
+.btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* --- inputs ------------------------------------------------------------------- */
+
+.input {
+  width: 100%;
+  min-height: 44px;
+  padding: 8px 12px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-input);
+  font-size: var(--text-md);
+  transition: border-color var(--dur) var(--ease);
+}
+
+.input:focus {
+  outline: none;
+  border-color: var(--border-strong);
+}
+
+.input::placeholder { color: var(--faint); }
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* --- misc ----------------------------------------------------------------------- */
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  border-radius: var(--radius-pill);
+  font-size: var(--text-xs);
+  font-weight: 500;
+}
+
+.pill--active { background: var(--saving-tint); color: var(--saving); }
+.pill--done { background: var(--income-tint); color: var(--income); }
+
+.dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
