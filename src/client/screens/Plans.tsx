@@ -2,7 +2,8 @@ import { useMemo, useState } from 'react';
 import { planStates } from '../../shared/calc';
 import { currentMonthISO } from '../../shared/format';
 import type { PaymentPlan } from '../../shared/types';
-import { useAddPlan, useAppData, useDeletePlan, useUpdatePlan } from '../api/data';
+import { useAddPlan, useAppData, useCurrentCycle, useDeletePlan, useUpdatePlan } from '../api/data';
+import { RecurringSwitcher } from './Subscriptions';
 import { PlanCard } from '../components/PlanCard';
 import { parseAmount } from '../components/QuickAdd';
 import { Icon } from '../components/ui/Icon';
@@ -14,7 +15,7 @@ export function Plans() {
   const { data, isLoading } = useAppData();
   const del = useDeletePlan();
   const toast = useToast();
-  const currentMonth = currentMonthISO();
+  const currentMonth = useCurrentCycle();
   const [editor, setEditor] = useState<{ open: boolean; plan: PaymentPlan | null }>({
     open: false,
     plan: null,
@@ -37,7 +38,7 @@ export function Plans() {
   return (
     <div className="stack">
       <div className="screen-head">
-        <h1 className="screen-title">Payment plans</h1>
+        <RecurringSwitcher current="plans" />
         <button className="btn btn--ghost" onClick={() => setEditor({ open: true, plan: null })}>
           <Icon name="plus" size={15} />
           New plan

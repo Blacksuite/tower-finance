@@ -79,7 +79,16 @@ export function CashFlowChart({ data, colors }: { data: MonthDatum[]; colors: Co
         <YAxis {...AXIS} stroke={colors.faint} width={34} tickFormatter={eurTick} />
         <Tooltip
           cursor={{ fill: colors.neutral }}
-          content={makeTooltip((d) => series.map(([k, name, color]) => ({ name, color, value: fmtEUR(d[k] as number) })))}
+          content={makeTooltip((d) =>
+            series.map(([k, name, color]) => ({
+              name,
+              color,
+              value:
+                k === 'income' || d.income <= 0
+                  ? fmtEUR(d[k] as number)
+                  : `${fmtEUR(d[k] as number)} · ${fmtPct((d[k] as number) / d.income)}`,
+            })),
+          )}
         />
         {series.map(([key, , color]) => (
           <Bar key={key} dataKey={key} fill={color} radius={[3, 3, 0, 0]} maxBarSize={18} isAnimationActive />

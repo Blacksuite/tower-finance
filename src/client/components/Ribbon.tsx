@@ -1,6 +1,7 @@
 import { motion, useReducedMotion } from 'framer-motion';
+import { useState } from 'react';
 import type { Summary } from '../../shared/calc';
-import { fmtEUR } from '../../shared/format';
+import { fmtEUR, fmtPct } from '../../shared/format';
 import { AnimatedAmount, EmptyState } from './ui/primitives';
 import { useQuickAdd } from './QuickAdd';
 
@@ -15,9 +16,10 @@ interface Seg {
  * The dashboard hero: income splitting into expenses / savings / investments /
  * left over as one full-width segmented bar, segments growing in from the left.
  */
-export function Ribbon({ summary }: { summary: Summary }) {
+export function Ribbon({ summary, netWorth }: { summary: Summary; netWorth?: number }) {
   const reduced = useReducedMotion();
   const { openNew } = useQuickAdd();
+  const [hover, setHover] = useState<Seg | null>(null);
   const { income, expenses, saved, invested, leftOver } = summary;
 
   const segs: Seg[] = [
@@ -38,16 +40,22 @@ export function Ribbon({ summary }: { summary: Summary }) {
           <div className="label" style={{ marginBottom: 4 }}>Income</div>
           <AnimatedAmount value={income} className="amount ribbon__income" />
         </div>
-        {income > 0 && (
-          <div style={{ textAlign: 'right' }}>
-            <div className="label" style={{ marginBottom: 4 }}>Savings rate</div>
-            <AnimatedAmount
-              value={summary.savingsRate * 100}
-              format={(n) => `${n.toFixed(0)}%`}
-              className="amount"
-            />
+        {hover ? (
+          <div style={{ textAlign: 'right' }} aria-live="polite">
+            <div className="label" style={{ marginBottom: 4, color: hover.color }}>{hover.label}</div>
+            <span className="amount" style={{ fontSize: 'var(--text-lg)' }}>
+              {fmtEUR(hover.value)}
+              <span style={{ color: 'var(--muted)', fontWeight: 500 }}>
+                {' '}· {income > 0 ? fmtPct(hover.value / income) : '—'}
+              </span>
+            </span>
           </div>
-        )}
+        ) : netWorth !== undefined ? (
+          <div style={{ textAlign: 'right' }}>
+            <div className="label" style={{ marginBottom: 4 }}>Net worth</div>
+            <AnimatedAmount value={netWorth} className="amount" style={{ fontSize: 'var(--text-lg)' }} />
+          </div>
+        ) : null}
       </div>
 
       {hasData ? (
@@ -58,6 +66,10 @@ export function Ribbon({ summary }: { summary: Summary }) {
                 key={s.key}
                 className="ribbon__seg"
                 style={{ width: `${(s.value / base) * 100}%`, background: s.color }}
+                title={`${s.label}: ${fmtEUR(s.value)} (${income > 0 ? fmtPct(s.value / income) : '—'} of income)`}
+                onMouseEnter={() => setHover(s)}
+                onMouseLeave={() => setHover(null)}
+                onClick={() => setHover(hover?.key === s.key ? null : s)}
                 initial={reduced ? false : { scaleX: 0 }}
                 animate={{ scaleX: 1 }}
                 transition={{ duration: 0.55, delay: i * 0.09, ease: [0.22, 1, 0.36, 1] }}
@@ -70,6 +82,11 @@ export function Ribbon({ summary }: { summary: Summary }) {
                 <span className="ribbon__legend-label label">
                   <span className="dot" style={{ background: s.color }} />
                   {s.label}
+                  {income > 0 && (
+                    <span style={{ textTransform: 'none', letterSpacing: 0 }}>
+                      · {fmtPct(s.value / income)}
+                    </span>
+                  )}
                 </span>
                 <AnimatedAmount value={s.value} className="amount ribbon__legend-amount" />
               </div>

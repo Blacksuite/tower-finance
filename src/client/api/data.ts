@@ -4,26 +4,39 @@ import {
   useQueryClient,
   type QueryClient,
 } from '@tanstack/react-query';
+import { currentCycleKey } from '../../shared/calc';
+import { currentMonthISO, todayISO } from '../../shared/format';
 import type {
   AppData,
   Category,
+  ExpenseTemplate,
   PaymentPlan,
   Settings,
+  Subscription,
   Transaction,
 } from '../../shared/types';
 import { useToast } from '../components/ui/Toast';
 
 const KEY = ['bootstrap'];
 
+const KEY_STORE = 'tower-key';
+export const getAuthKey = () => localStorage.getItem(KEY_STORE) ?? '';
+export const setAuthKey = (k: string) => localStorage.setItem(KEY_STORE, k);
+
 async function api<T>(method: string, path: string, body?: unknown): Promise<T> {
   const res = await fetch(`/api${path}`, {
     method,
-    headers: body !== undefined ? { 'Content-Type': 'application/json' } : undefined,
+    headers: {
+      'x-tower-key': getAuthKey(),
+      ...(body !== undefined ? { 'Content-Type': 'application/json' } : {}),
+    },
     body: body !== undefined ? JSON.stringify(body) : undefined,
   });
   if (!res.ok) {
     const err = (await res.json().catch(() => null)) as { error?: string } | null;
-    throw new Error(err?.error || `Request failed (${res.status})`);
+    throw Object.assign(new Error(err?.error || `Request failed (${res.status})`), {
+      status: res.status,
+    });
   }
   return res.json() as Promise<T>;
 }
@@ -34,6 +47,12 @@ export function useAppData() {
     queryFn: () => api<AppData>('GET', '/bootstrap'),
     staleTime: 60_000,
   });
+}
+
+/** Label of the salary cycle containing today (= calendar month by default). */
+export function useCurrentCycle(): string {
+  const { data } = useAppData();
+  return data ? currentCycleKey(data.settings, todayISO()) : currentMonthISO();
 }
 
 /**
@@ -120,17 +139,72 @@ export function useUpdateCategory() {
 }
 
 export function useDeleteCategory() {
+  const remap = <T extends { categoryId: string | null }>(items: T[], id: string, to: string | null) =>
+    items.map((t) => (t.categoryId === id ? { ...t, categoryId: to } : t));
   return useOptimistic(
     (v: { id: string; reassignTo: string | null }) =>
       api('DELETE', `/categories/${v.id}`, { reassignTo: v.reassignTo }),
     (data, v) => ({
       ...data,
       categories: data.categories.filter((x) => x.id !== v.id),
-      transactions: data.transactions.map((t) =>
-        t.categoryId === v.id ? { ...t, categoryId: v.reassignTo } : t,
-      ),
+      transactions: remap(data.transactions, v.id, v.reassignTo),
+      subscriptions: remap(data.subscriptions, v.id, v.reassignTo),
+      templates: remap(data.templates, v.id, v.reassignTo),
     }),
   );
+}
+
+export type SubscriptionInput = Omit<Subscription, 'id'>;
+
+export function useAddSubscription() {
+  return useOptimistic(
+    (s: SubscriptionInput) => api<Subscription>('POST', '/subscriptions', s),
+    (data, s) => ({ ...data, subscriptions: [...data.subscriptions, { ...s, id: tempId() }] }),
+  );
+}
+
+export function useUpdateSubscription() {
+  return useOptimistic(
+    (s: Subscription) => api<Subscription>('PUT', `/subscriptions/${s.id}`, stripId(s)),
+    (data, s) => ({ ...data, subscriptions: data.subscriptions.map((x) => (x.id === s.id ? s : x)) }),
+  );
+}
+
+export function useDeleteSubscription() {
+  return useOptimistic(
+    (id: string) => api('DELETE', `/subscriptions/${id}`),
+    (data, id) => ({ ...data, subscriptions: data.subscriptions.filter((x) => x.id !== id) }),
+  );
+}
+
+export type TemplateInput = Omit<ExpenseTemplate, 'id'>;
+
+export function useAddTemplate() {
+  return useOptimistic(
+    (t: TemplateInput) => api<ExpenseTemplate>('POST', '/templates', t),
+    (data, t) => ({ ...data, templates: [...data.templates, { ...t, id: tempId() }] }),
+  );
+}
+
+export function useUpdateTemplate() {
+  return useOptimistic(
+    (t: ExpenseTemplate) => api<ExpenseTemplate>('PUT', `/templates/${t.id}`, stripId(t)),
+    (data, t) => ({ ...data, templates: data.templates.map((x) => (x.id === t.id ? t : x)) }),
+  );
+}
+
+export function useDeleteTemplate() {
+  return useOptimistic(
+    (id: string) => api('DELETE', `/templates/${id}`),
+    (data, id) => ({ ...data, templates: data.templates.filter((x) => x.id !== id) }),
+  );
+}
+
+/** Enable / change / disable the password. Stores the rotated session token. */
+export async function manageAuth(body: { current?: string; next?: string; enabled: boolean }) {
+  const res = await api<{ enabled: boolean; token: string | null }>('POST', '/auth', body);
+  setAuthKey(res.token ?? '');
+  return res;
 }
 
 export type PlanInput = Omit<PaymentPlan, 'id'>;

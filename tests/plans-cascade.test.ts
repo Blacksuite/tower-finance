@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { planSchedule, planExpensesForMonth } from '../src/shared/calc';
-import type { AppData, PaymentPlan, PlanPayment } from '../src/shared/types';
+import { DEFAULT_SETTINGS, type AppData, type PaymentPlan, type PlanPayment } from '../src/shared/types';
 
 const plan = (over: Partial<PaymentPlan> = {}): PaymentPlan => ({
   id: 'p1',
@@ -112,7 +112,10 @@ describe('plan payments flow into monthly expenses', () => {
   const data: AppData = {
     transactions: [],
     categories: [],
-    settings: { savingsTarget: 0, investmentsTarget: 0, startingNetWorth: 0 },
+    settings: DEFAULT_SETTINGS,
+    subscriptions: [],
+    templates: [],
+    auth: { enabled: false },
     plans: [
       plan(),
       plan({ id: 'p2', name: 'Phone', totalAmount: 600, installment: 50, startMonth: '2026-02' }),

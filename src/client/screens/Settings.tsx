@@ -1,13 +1,20 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { useEffect, useRef, useState } from 'react';
-import type { Category } from '../../shared/types';
+import { salaryDate } from '../../shared/cycles';
+import { fmtDate, fmtEUR, currentMonthISO } from '../../shared/format';
+import type { BillingFrequency, Category, ExpenseTemplate } from '../../shared/types';
 import {
+  getAuthKey,
   importData,
+  manageAuth,
   useAddCategory,
+  useAddTemplate,
   useAppData,
   useDeleteCategory,
+  useDeleteTemplate,
   useUpdateCategory,
   useUpdateSettings,
+  useUpdateTemplate,
 } from '../api/data';
 import { parseAmount } from '../components/QuickAdd';
 import { Icon } from '../components/ui/Icon';
@@ -47,6 +54,10 @@ export function Settings() {
         />
       </Section>
 
+      <Section title="Salary cycle">
+        <SalaryCycleForm />
+      </Section>
+
       <Section title="Monthly targets & net worth">
         <TargetsForm />
       </Section>
@@ -55,10 +66,299 @@ export function Settings() {
         <CategoryManager categories={data.categories} />
       </Section>
 
+      <Section title="Recurring expense templates">
+        <TemplateManager templates={data.templates} categories={data.categories} />
+      </Section>
+
+      <Section title="Security">
+        <SecurityForm enabled={data.auth.enabled} />
+      </Section>
+
+      <Section title="Currency & locale">
+        <CurrencyForm />
+      </Section>
+
       <Section title="Backup">
         <BackupControls />
       </Section>
     </div>
+  );
+}
+
+function SalaryCycleForm() {
+  const { data } = useAppData();
+  const update = useUpdateSettings();
+  if (!data) return null;
+  const s = data.settings;
+  const example = salaryDate(currentMonthISO(), s);
+  return (
+    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16, alignItems: 'flex-end' }}>
+      <div className="field" style={{ maxWidth: 160 }}>
+        <label className="label" htmlFor="set-salaryday">Salary day of month</label>
+        <input
+          id="set-salaryday"
+          className="input amount"
+          type="number"
+          min={1}
+          max={31}
+          value={s.salaryDay}
+          onChange={(e) => {
+            const n = Math.min(31, Math.max(1, Math.round(Number(e.target.value) || 1)));
+            update.mutate({ salaryDay: n });
+          }}
+        />
+      </div>
+      <div className="field" style={{ maxWidth: 220 }}>
+        <label className="label" htmlFor="set-weekend">If it falls on a weekend</label>
+        <select
+          id="set-weekend"
+          className="input"
+          value={s.weekendRule}
+          onChange={(e) => update.mutate({ weekendRule: e.target.value as typeof s.weekendRule })}
+        >
+          <option value="previous">Previous Friday</option>
+          <option value="exact">Exact date</option>
+          <option value="next">Next Monday</option>
+        </select>
+      </div>
+      <span className="tx-row__secondary" style={{ paddingBottom: 12 }}>
+        Budget periods run from one salary date to the day before the next.
+        This month's salary date: <strong>{fmtDate(example)}</strong>.
+      </span>
+    </div>
+  );
+}
+
+function CurrencyForm() {
+  const { data } = useAppData();
+  const update = useUpdateSettings();
+  const [currency, setCurrency] = useState(data?.settings.currency ?? 'EUR');
+  const [locale, setLocale] = useState(data?.settings.locale ?? 'nl-NL');
+  if (!data) return null;
+  const commit = () => {
+    const cur = currency.trim().toUpperCase();
+    const loc = locale.trim();
+    if (/^[A-Z]{3}$/.test(cur) && loc.length >= 2 &&
+        (cur !== data.settings.currency || loc !== data.settings.locale)) {
+      update.mutate({ currency: cur, locale: loc });
+      setTimeout(() => location.reload(), 350); // formatters are module-level; reload applies them everywhere
+    }
+  };
+  return (
+    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16, alignItems: 'flex-end' }}>
+      <div className="field" style={{ maxWidth: 120 }}>
+        <label className="label" htmlFor="set-currency">Currency</label>
+        <input id="set-currency" className="input" value={currency} maxLength={3}
+          onChange={(e) => setCurrency(e.target.value)} onBlur={commit}
+          onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()} />
+      </div>
+      <div className="field" style={{ maxWidth: 140 }}>
+        <label className="label" htmlFor="set-locale">Locale</label>
+        <input id="set-locale" className="input" value={locale}
+          onChange={(e) => setLocale(e.target.value)} onBlur={commit}
+          onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()} />
+      </div>
+      <span className="tx-row__secondary" style={{ paddingBottom: 12 }}>
+        e.g. EUR + nl-NL → {fmtEUR(1234.56)}
+      </span>
+    </div>
+  );
+}
+
+function SecurityForm({ enabled }: { enabled: boolean }) {
+  const qc = useQueryClient();
+  const toast = useToast();
+  const [current, setCurrent] = useState('');
+  const [next, setNext] = useState('');
+  const [confirmPw, setConfirmPw] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  const run = async (body: { current?: string; next?: string; enabled: boolean }, msg: string) => {
+    setBusy(true);
+    try {
+      await manageAuth(body);
+      await qc.invalidateQueries({ queryKey: ['bootstrap'] });
+      setCurrent(''); setNext(''); setConfirmPw('');
+      toast.show(msg);
+    } catch (err) {
+      toast.show(err instanceof Error ? err.message : 'Failed', { error: true });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const mismatch = next.length > 0 && next !== confirmPw;
+  const canSubmit = next.length >= 4 && next === confirmPw && (!enabled || current.length > 0);
+
+  return (
+    <form
+      style={{ display: 'flex', flexWrap: 'wrap', gap: 16, alignItems: 'flex-end' }}
+      onSubmit={(e) => {
+        e.preventDefault();
+        if (canSubmit) run({ current: enabled ? current : undefined, next, enabled: true }, enabled ? 'Password changed' : 'Password protection enabled');
+      }}
+    >
+      {enabled && (
+        <div className="field" style={{ maxWidth: 200 }}>
+          <label className="label" htmlFor="sec-current">Current password</label>
+          <input id="sec-current" className="input" type="password" autoComplete="current-password" value={current} onChange={(e) => setCurrent(e.target.value)} />
+        </div>
+      )}
+      <div className="field" style={{ maxWidth: 200 }}>
+        <label className="label" htmlFor="sec-next">{enabled ? 'New password' : 'Password'}</label>
+        <input id="sec-next" className="input" type="password" autoComplete="new-password" value={next} onChange={(e) => setNext(e.target.value)} />
+      </div>
+      <div className="field" style={{ maxWidth: 200 }}>
+        <label className="label" htmlFor="sec-confirm">Confirm</label>
+        <input id="sec-confirm" className="input" type="password" autoComplete="new-password" value={confirmPw} onChange={(e) => setConfirmPw(e.target.value)} />
+      </div>
+      <button type="submit" className="btn btn--ghost" disabled={busy || !canSubmit}>
+        {enabled ? 'Change password' : 'Enable protection'}
+      </button>
+      {enabled && (
+        <button
+          type="button"
+          className="btn btn--danger btn--sm"
+          disabled={busy || current.length === 0}
+          onClick={() => run({ current, enabled: false }, 'Password protection disabled')}
+        >
+          Disable
+        </button>
+      )}
+      <span className="tx-row__secondary" style={{ width: '100%' }}>
+        {mismatch
+          ? 'Passwords do not match.'
+          : enabled
+            ? 'The app asks for this password on every device. Stored as a salted hash, never in backups.'
+            : 'Optional — when enabled, a login screen protects the app (min 4 characters).'}
+      </span>
+    </form>
+  );
+}
+
+function TemplateManager({ templates, categories }: { templates: ExpenseTemplate[]; categories: Category[] }) {
+  const del = useDeleteTemplate();
+  const toast = useToast();
+  const [editor, setEditor] = useState<{ open: boolean; tpl: ExpenseTemplate | null }>({ open: false, tpl: null });
+  const catName = new Map(categories.map((c) => [c.id, c.name]));
+
+  return (
+    <div>
+      {templates.length === 0 && (
+        <span className="tx-row__secondary">
+          Templates pre-fill the quick-add form from a dropdown — handy for routine expenses.
+        </span>
+      )}
+      {templates.map((t) => (
+        <div key={t.id} className="settings-row">
+          <span className="settings-row__name" style={{ fontSize: 'var(--text-sm)', fontWeight: 500 }}>
+            {t.name}
+            <span className="tx-row__secondary" style={{ display: 'block' }}>
+              {fmtEUR(t.amount)} · {t.categoryId ? catName.get(t.categoryId) ?? '—' : 'no category'}
+              {t.defaultDay ? ` · day ${t.defaultDay}` : ''}
+            </span>
+          </span>
+          <button className="icon-btn" onClick={() => setEditor({ open: true, tpl: t })} aria-label={`Edit ${t.name}`}>
+            <Icon name="pencil" size={15} />
+          </button>
+          <button
+            className="icon-btn"
+            aria-label={`Delete ${t.name}`}
+            onClick={() => { del.mutate(t.id); toast.show('Template deleted'); }}
+          >
+            <Icon name="trash" size={15} />
+          </button>
+        </div>
+      ))}
+      <button className="btn btn--ghost btn--sm" style={{ marginTop: 12 }} onClick={() => setEditor({ open: true, tpl: null })}>
+        <Icon name="plus" size={14} />
+        New template
+      </button>
+      <Sheet
+        open={editor.open}
+        onClose={() => setEditor((e) => ({ ...e, open: false }))}
+        title={editor.tpl ? 'Edit template' : 'New template'}
+      >
+        {editor.open && (
+          <TemplateForm tpl={editor.tpl} categories={categories} onDone={() => setEditor((e) => ({ ...e, open: false }))} />
+        )}
+      </Sheet>
+    </div>
+  );
+}
+
+function TemplateForm({ tpl, categories, onDone }: { tpl: ExpenseTemplate | null; categories: Category[]; onDone: () => void }) {
+  const add = useAddTemplate();
+  const update = useUpdateTemplate();
+  const toast = useToast();
+  const [name, setName] = useState(tpl?.name ?? '');
+  const [amount, setAmount] = useState(tpl ? String(tpl.amount).replace('.', ',') : '');
+  const [categoryId, setCategoryId] = useState(tpl?.categoryId ?? '');
+  const [description, setDescription] = useState(tpl?.description ?? '');
+  const [freq, setFreq] = useState<BillingFrequency>(tpl?.frequency ?? 'monthly');
+  const [day, setDay] = useState(tpl?.defaultDay ? String(tpl.defaultDay) : '');
+
+  const amountN = parseAmount(amount);
+  const valid = name.trim().length > 0 && amountN !== null;
+
+  const submit = () => {
+    if (!valid) return;
+    const dayN = day.trim() === '' ? null : Math.min(31, Math.max(1, Math.round(Number(day) || 1)));
+    const payload = {
+      name: name.trim(), amount: amountN!, categoryId: categoryId || null,
+      description: description.trim(), frequency: freq, defaultDay: dayN,
+    };
+    if (tpl) update.mutate({ ...payload, id: tpl.id });
+    else add.mutate(payload);
+    toast.show(tpl ? 'Template updated' : 'Template added');
+    onDone();
+  };
+
+  return (
+    <form className="qa-form" onSubmit={(e) => { e.preventDefault(); submit(); }}>
+      <div className="qa-row">
+        <div className="field">
+          <label className="label" htmlFor="tpl-name">Name</label>
+          <input id="tpl-name" className="input" placeholder="e.g. Fuel" value={name} onChange={(e) => setName(e.target.value)} />
+        </div>
+        <div className="field">
+          <label className="label" htmlFor="tpl-amount">Amount</label>
+          <input id="tpl-amount" className="input" inputMode="decimal" placeholder="€ 60,00" value={amount} onChange={(e) => setAmount(e.target.value)} />
+        </div>
+      </div>
+      <div className="qa-row">
+        <div className="field">
+          <label className="label" htmlFor="tpl-cat">Category</label>
+          <select id="tpl-cat" className="input" value={categoryId} onChange={(e) => setCategoryId(e.target.value)}>
+            <option value="">No category</option>
+            {categories.map((c) => (
+              <option key={c.id} value={c.id}>{c.name}</option>
+            ))}
+          </select>
+        </div>
+        <div className="field">
+          <label className="label" htmlFor="tpl-day">Default day (optional)</label>
+          <input id="tpl-day" className="input" type="number" min={1} max={31} placeholder="e.g. 15" value={day} onChange={(e) => setDay(e.target.value)} />
+        </div>
+      </div>
+      <div className="qa-row">
+        <div className="field">
+          <label className="label" htmlFor="tpl-desc">Description</label>
+          <input id="tpl-desc" className="input" placeholder="Optional" value={description} onChange={(e) => setDescription(e.target.value)} />
+        </div>
+        <div className="field">
+          <label className="label" htmlFor="tpl-freq">Frequency</label>
+          <select id="tpl-freq" className="input" value={freq} onChange={(e) => setFreq(e.target.value as BillingFrequency)}>
+            <option value="monthly">Monthly</option>
+            <option value="quarterly">Quarterly</option>
+            <option value="yearly">Yearly</option>
+          </select>
+        </div>
+      </div>
+      <button type="submit" className="btn btn--primary" disabled={!valid}>
+        {tpl ? 'Save changes' : 'Add template'}
+      </button>
+    </form>
   );
 }
 
@@ -314,12 +614,27 @@ function BackupControls() {
     }
   };
 
+  const onExport = async () => {
+    // fetch (not a plain link) so the auth header is sent when protection is on
+    const res = await fetch('/api/export', { headers: { 'x-tower-key': getAuthKey() } });
+    if (!res.ok) {
+      toast.show('Export failed', { error: true });
+      return;
+    }
+    const url = URL.createObjectURL(await res.blob());
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `tower-finance-${new Date().toISOString().slice(0, 10)}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12 }}>
-      <a className="btn btn--ghost" href="/api/export" download>
+      <button className="btn btn--ghost" onClick={onExport}>
         <Icon name="download" size={15} />
         Export JSON
-      </a>
+      </button>
       <button className="btn btn--ghost" disabled={busy} onClick={() => fileRef.current?.click()}>
         <Icon name="upload" size={15} />
         Import JSON

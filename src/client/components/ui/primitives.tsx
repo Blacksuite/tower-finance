@@ -41,11 +41,13 @@ export function AnimatedAmount({
   value,
   format = fmtEUR,
   className,
+  style,
   duration = 600,
 }: {
   value: number;
   format?: (n: number) => string;
   className?: string;
+  style?: React.CSSProperties;
   duration?: number;
 }) {
   const reduced = useReducedMotion();
@@ -71,7 +73,7 @@ export function AnimatedAmount({
     return () => cancelAnimationFrame(raf.current);
   }, [value, duration, reduced]);
 
-  return <span className={className}>{format(display)}</span>;
+  return <span className={className} style={style}>{format(display)}</span>;
 }
 
 // --- empty state -------------------------------------------------------------------

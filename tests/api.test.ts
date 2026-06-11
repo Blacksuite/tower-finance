@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { createApp } from '../src/server/app';
 import { createDb, readAll, SEED_CATEGORIES, type DB } from '../src/server/db';
-import type { AppData } from '../src/shared/types';
+import { DEFAULT_SETTINGS, type AppData } from '../src/shared/types';
 
 let db: DB;
 let app: ReturnType<typeof createApp>;
@@ -24,7 +24,7 @@ describe('bootstrap & seeding', () => {
     expect(res.status).toBe(200);
     const data = (await res.json()) as AppData;
     expect(data.categories.map((c) => c.name)).toEqual(SEED_CATEGORIES);
-    expect(data.settings).toEqual({ savingsTarget: 0, investmentsTarget: 0, startingNetWorth: 0 });
+    expect(data.settings).toEqual(DEFAULT_SETTINGS);
   });
 });
 
@@ -124,8 +124,8 @@ describe('plans & payments', () => {
 describe('settings, export & import', () => {
   it('persists settings partially', async () => {
     await json('PUT', '/api/settings', { savingsTarget: 500 });
-    const res = await json('PUT', '/api/settings', { startingNetWorth: 12000 });
-    expect(await res.json()).toEqual({ savingsTarget: 500, investmentsTarget: 0, startingNetWorth: 12000 });
+    const res = await json('PUT', '/api/settings', { startingNetWorth: 12000, salaryDay: 25 });
+    expect(await res.json()).toEqual({ ...DEFAULT_SETTINGS, savingsTarget: 500, startingNetWorth: 12000, salaryDay: 25 });
   });
 
   it('round-trips export → import', async () => {

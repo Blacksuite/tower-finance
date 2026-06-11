@@ -21,6 +21,44 @@ export interface Settings {
   savingsTarget: number;
   investmentsTarget: number;
   startingNetWorth: number;
+  /** day of month the salary arrives; cycles run salary date → day before next */
+  salaryDay: number;
+  weekendRule: 'previous' | 'exact' | 'next';
+  currency: string; // ISO 4217, e.g. EUR
+  locale: string; // BCP 47, e.g. nl-NL
+}
+
+export const DEFAULT_SETTINGS: Settings = {
+  savingsTarget: 0,
+  investmentsTarget: 0,
+  startingNetWorth: 0,
+  salaryDay: 1,
+  weekendRule: 'exact',
+  currency: 'EUR',
+  locale: 'nl-NL',
+};
+
+export type BillingFrequency = 'monthly' | 'quarterly' | 'yearly';
+
+export interface Subscription {
+  id: string;
+  name: string;
+  amount: number;
+  categoryId: string | null;
+  description: string;
+  firstBillDate: string; // YYYY-MM-DD anchor; subsequent bills step by frequency
+  frequency: BillingFrequency;
+  endsOn: string | null; // set when disabled so past cycles keep the expense
+}
+
+export interface ExpenseTemplate {
+  id: string;
+  name: string;
+  amount: number;
+  categoryId: string | null;
+  description: string;
+  frequency: BillingFrequency; // informational
+  defaultDay: number | null; // pre-fills the date field (clamped), else today
 }
 
 export interface PaymentPlan {
@@ -43,4 +81,7 @@ export interface AppData {
   settings: Settings;
   plans: PaymentPlan[];
   planPayments: PlanPayment[];
+  subscriptions: Subscription[];
+  templates: ExpenseTemplate[];
+  auth: { enabled: boolean };
 }

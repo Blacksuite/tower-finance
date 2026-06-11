@@ -1,12 +1,24 @@
 // All derived numbers in the app come from this module. Pure functions over
 // raw rows; every division is guarded so empty months can never produce NaN.
+import { cycleKeyOf, type CycleSettings } from './cycles';
+import { subExpensesForCycle } from './recurring';
 import type {
   AppData,
   Category,
   PaymentPlan,
   PlanPayment,
+  Settings,
   Transaction,
 } from './types';
+
+/**
+ * Cycle label (YYYY-MM) a transaction date belongs to. With default settings
+ * (salaryDay 1, exact) this is simply the calendar month.
+ */
+export const keyOf = (date: string, s: CycleSettings): string => cycleKeyOf(date, s);
+
+export const currentCycleKey = (s: Settings, todayDate: string): string =>
+  cycleKeyOf(todayDate, s);
 
 const EPS = 0.005; // amounts are euros with 2 decimals
 const MAX_SCHEDULE_MONTHS = 1200;
@@ -109,29 +121,34 @@ export function planExpensesForMonth(data: AppData, month: string): number {
 
 export interface Summary {
   income: number;
-  expenses: number; // transaction expenses + counted plan payments
+  expenses: number; // transaction expenses + plan payments + subscriptions
   transactionExpenses: number;
   planExpenses: number;
+  subscriptionExpenses: number;
   saved: number;
   invested: number;
   leftOver: number;
   savingsRate: number; // (saved + invested) / income, 0 when income is 0
 }
 
-function sumByType(transactions: Transaction[], months: Set<string>) {
+function sumByType(transactions: Transaction[], labels: Set<string>, s: CycleSettings) {
   const t = { income: 0, expense: 0, saving: 0, investment: 0 };
   for (const tx of transactions) {
-    if (months.has(monthOf(tx.date))) t[tx.type] += tx.amount;
+    if (labels.has(keyOf(tx.date, s))) t[tx.type] += tx.amount;
   }
   return t;
 }
 
 export function summarize(data: AppData, months: string[]): Summary {
   const set = new Set(months);
-  const t = sumByType(data.transactions, set);
+  const t = sumByType(data.transactions, set, data.settings);
   let planExpenses = 0;
-  for (const m of months) planExpenses += planExpensesForMonth(data, m);
-  const expenses = round2(t.expense + planExpenses);
+  let subscriptionExpenses = 0;
+  for (const m of months) {
+    planExpenses += planExpensesForMonth(data, m);
+    subscriptionExpenses += subExpensesForCycle(data.subscriptions, m, data.settings).total;
+  }
+  const expenses = round2(t.expense + planExpenses + subscriptionExpenses);
   const income = round2(t.income);
   const saved = round2(t.saving);
   const invested = round2(t.investment);
@@ -140,6 +157,7 @@ export function summarize(data: AppData, months: string[]): Summary {
     expenses,
     transactionExpenses: round2(t.expense),
     planExpenses: round2(planExpenses),
+    subscriptionExpenses: round2(subscriptionExpenses),
     saved,
     invested,
     leftOver: round2(income - expenses - saved - invested),
@@ -154,12 +172,21 @@ export const monthlySummary = (data: AppData, month: string): Summary =>
 // Months with data / active months
 // ---------------------------------------------------------------------------
 
-/** Every month that has any data (transactions or counted plan payments), ascending. */
+/** Every cycle that has any data (transactions, plan payments, subscriptions), ascending. */
 export function monthsWithData(data: AppData, currentMonth: string): string[] {
   const set = new Set<string>();
-  for (const tx of data.transactions) set.add(monthOf(tx.date));
+  for (const tx of data.transactions) set.add(keyOf(tx.date, data.settings));
   for (const st of planStates(data, currentMonth)) {
     for (const r of st.rows) if (r.counted > EPS) set.add(r.month);
+  }
+  for (const sub of data.subscriptions) {
+    // subscriptions never extend the axis into the future beyond now
+    let label = keyOf(sub.firstBillDate, data.settings);
+    const stop = sub.endsOn ? keyOf(sub.endsOn, data.settings) : currentMonth;
+    for (let i = 0; label <= stop && label <= currentMonth && i < MAX_SCHEDULE_MONTHS; i++) {
+      if (subExpensesForCycle([sub], label, data.settings).total > EPS) set.add(label);
+      label = addMonths(label, 1);
+    }
   }
   return [...set].sort();
 }
@@ -172,12 +199,12 @@ export function monthAxis(data: AppData, currentMonth: string): string[] {
   return monthRange(months[0], last);
 }
 
-/** Months in `year` (through `currentMonth`) that have any income or expense recorded. */
+/** Cycles in `year` (through `currentMonth`) that have any income or expense recorded. */
 export function activeMonths(data: AppData, year: string, currentMonth: string): string[] {
   const set = new Set<string>();
   for (const tx of data.transactions) {
     if (tx.type !== 'income' && tx.type !== 'expense') continue;
-    const m = monthOf(tx.date);
+    const m = keyOf(tx.date, data.settings);
     if (m.startsWith(year) && m <= currentMonth) set.add(m);
   }
   return [...set].sort();
@@ -202,9 +229,14 @@ export interface BudgetRow {
 function categoryActuals(data: AppData, months: Set<string>): Map<string, number> {
   const map = new Map<string, number>();
   for (const tx of data.transactions) {
-    if (tx.type !== 'expense' || !months.has(monthOf(tx.date))) continue;
+    if (tx.type !== 'expense' || !months.has(keyOf(tx.date, data.settings))) continue;
     const key = tx.categoryId ?? '';
     map.set(key, (map.get(key) ?? 0) + tx.amount);
+  }
+  for (const m of months) {
+    for (const [key, amount] of subExpensesForCycle(data.subscriptions, m, data.settings).byCategory) {
+      map.set(key, (map.get(key) ?? 0) + amount);
+    }
   }
   return map;
 }
@@ -235,7 +267,7 @@ export function budgetVsActual(
       pct: budget > EPS ? actual / budget : actual > EPS ? Infinity : 0,
     });
   }
-  const t = sumByType(data.transactions, set);
+  const t = sumByType(data.transactions, set, data.settings);
   const targets: Array<['saving' | 'investment', string, number, number]> = [
     ['saving', 'Savings', data.settings.savingsTarget, t.saving],
     ['investment', 'Investments', data.settings.investmentsTarget, t.investment],
@@ -276,17 +308,105 @@ export interface NetWorthPoint {
   value: number;
 }
 
+/** Outstanding plan balance at the end of cycle `label` (0 before a plan starts). */
+function liabilitiesAt(data: AppData, label: string): number {
+  let sum = 0;
+  for (const plan of data.plans) {
+    if (label < plan.startMonth) continue;
+    const st = planSchedule(plan, data.planPayments, label);
+    sum += st.remaining;
+  }
+  return round2(sum);
+}
+
+/**
+ * Net worth per cycle: starting net worth + cumulative cash flow, minus the
+ * outstanding payment-plan balance at that point (plans count as liabilities).
+ */
 export function netWorthSeries(data: AppData, currentMonth: string): NetWorthPoint[] {
-  let value = data.settings.startingNetWorth;
+  let cash = data.settings.startingNetWorth;
   // future scheduled plan installments are not "paid", so the series stops at
   // the current real month rather than projecting forward
   return monthAxis(data, currentMonth)
     .filter((m) => m <= currentMonth)
     .map((month) => {
       const s = monthlySummary(data, month);
-      value = round2(value + s.income - s.expenses);
-      return { month, value };
+      cash = round2(cash + s.income - s.expenses);
+      return { month, value: round2(cash - liabilitiesAt(data, month)) };
     });
+}
+
+export interface NetWorthBreakdown {
+  total: number;
+  cash: number; // starting net worth + cumulative cash flow − savings − investments
+  savings: { account: string; amount: number }[];
+  investments: { account: string; amount: number }[];
+  liabilities: { name: string; amount: number }[];
+}
+
+export function netWorthBreakdown(data: AppData, currentMonth: string): NetWorthBreakdown {
+  const labels = monthAxis(data, currentMonth).filter((m) => m <= currentMonth);
+  const all = summarize(data, labels);
+  const grossCash = round2(data.settings.startingNetWorth + all.income - all.expenses);
+
+  const byAccount = (type: 'saving' | 'investment') => {
+    const map = new Map<string, number>();
+    for (const tx of data.transactions) {
+      if (tx.type !== type) continue;
+      const key = tx.account || 'Unassigned';
+      map.set(key, round2((map.get(key) ?? 0) + tx.amount));
+    }
+    return [...map.entries()]
+      .map(([account, amount]) => ({ account, amount }))
+      .sort((a, b) => b.amount - a.amount);
+  };
+
+  const savings = byAccount('saving');
+  const investments = byAccount('investment');
+  const savedTotal = savings.reduce((a, x) => a + x.amount, 0);
+  const investedTotal = investments.reduce((a, x) => a + x.amount, 0);
+
+  const liabilities = data.plans
+    .map((p) => ({ name: p.name, amount: planSchedule(p, data.planPayments, currentMonth).remaining }))
+    .filter((l) => l.amount > EPS)
+    .sort((a, b) => b.amount - a.amount);
+  const liabilityTotal = liabilities.reduce((a, x) => a + x.amount, 0);
+
+  // grossCash (cash-basis wealth) already contains money parked in savings and
+  // investments — the cash row is what's left after splitting those out.
+  return {
+    total: round2(grossCash - liabilityTotal),
+    cash: round2(grossCash - savedTotal - investedTotal),
+    savings,
+    investments,
+    liabilities,
+  };
+}
+
+export interface PlanAggregate {
+  total: number;
+  paid: number;
+  remaining: number;
+  progress: number; // 0..1
+  active: number; // number of active plans
+}
+
+export function planAggregate(data: AppData, currentMonth: string): PlanAggregate {
+  let total = 0;
+  let paid = 0;
+  let active = 0;
+  for (const st of planStates(data, currentMonth)) {
+    total += st.plan.totalAmount;
+    paid += st.paidToDate;
+    if (st.status === 'active') active++;
+  }
+  return {
+    total: round2(total),
+    paid: round2(paid),
+    remaining: round2(total - paid),
+    progress: total > EPS ? paid / total : 0,
+    active,
+  };
 }
 
 // ---------------------------------------------------------------------------

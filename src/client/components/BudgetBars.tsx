@@ -1,5 +1,5 @@
 import type { BudgetRow } from '../../shared/calc';
-import { fmtEUR, fmtSigned } from '../../shared/format';
+import { fmtEUR, fmtPct, fmtSigned } from '../../shared/format';
 import { EmptyState, Progress } from './ui/primitives';
 
 const KIND_COLOR: Record<BudgetRow['kind'], string> = {
@@ -57,15 +57,25 @@ export function CategoryBars({
     return <EmptyState icon="cart" message="No expenses yet — add one to see where money goes." />;
   }
   const max = items[0].amount;
+  const total = items.reduce((a, c) => a + c.amount, 0);
   return (
     <div>
       {items.map((c) => (
-        <div key={c.id} className="hbar-row">
+        <div
+          key={c.id}
+          className="hbar-row"
+          title={`${c.name}: ${fmtEUR(c.amount)} (${fmtPct(c.amount / total)} of spending)`}
+        >
           <span className="hbar-row__name">{c.name}</span>
           <span className="hbar-row__track">
             <span className="hbar-row__fill" style={{ width: `${(c.amount / max) * 100}%` }} />
           </span>
-          <span className="hbar-row__amount amount">{fmtEUR(c.amount)}</span>
+          <span className="hbar-row__amount amount">
+            {fmtEUR(c.amount)}
+            <span style={{ color: 'var(--faint)', fontWeight: 400, fontSize: 'var(--text-xs)' }}>
+              {' '}{fmtPct(c.amount / total)}
+            </span>
+          </span>
         </div>
       ))}
     </div>

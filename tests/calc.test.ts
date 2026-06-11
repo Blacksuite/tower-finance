@@ -11,7 +11,7 @@ import {
   summarize,
   topCategories,
 } from '../src/shared/calc';
-import type { AppData, Transaction } from '../src/shared/types';
+import { DEFAULT_SETTINGS, type AppData, type Settings, type Transaction } from '../src/shared/types';
 
 let id = 0;
 const tx = (
@@ -30,13 +30,18 @@ const tx = (
   ...extra,
 });
 
-const emptyData = (over: Partial<AppData> = {}): AppData => ({
+const emptyData = (
+  over: Partial<Omit<AppData, 'settings'>> & { settings?: Partial<Settings> } = {},
+): AppData => ({
   transactions: [],
   categories: [],
-  settings: { savingsTarget: 0, investmentsTarget: 0, startingNetWorth: 0 },
   plans: [],
   planPayments: [],
+  subscriptions: [],
+  templates: [],
+  auth: { enabled: false },
   ...over,
+  settings: { ...DEFAULT_SETTINGS, ...(over.settings ?? {}) },
 });
 
 describe('addMonths', () => {

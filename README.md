@@ -1,8 +1,14 @@
 # Tower Finance
 
-Self-hosted personal finance PWA: manual transaction entry, monthly budgets,
-payment plans with auto-scheduling, and a cash-flow dashboard. Single user,
-LAN only, no authentication. EUR / nl-NL formatting.
+Self-hosted personal finance PWA: manual transaction entry, salary-cycle
+budgeting (periods run from payday to payday, with weekend handling),
+subscriptions and recurring expense templates, payment plans with
+auto-scheduling, net worth tracking with asset/liability breakdown, transaction
+history filters, and a cash-flow dashboard. Single user, designed for LAN use.
+Optional password protection (managed in Settings, no env vars). Currency and
+locale are configurable (defaults: EUR / nl-NL).
+
+Upgrading an existing install? See [docs/UPGRADING.md](docs/UPGRADING.md).
 
 ## Run on Unraid (or any Docker host)
 

@@ -3,14 +3,18 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   addMonths,
   budgetVsActualMonth,
-  monthOf,
+  keyOf,
   monthlySummary,
   planStates,
   topCategories,
 } from '../../shared/calc';
+import { cycleBounds } from '../../shared/cycles';
+import { subOccurrencesForCycle } from '../../shared/recurring';
 import { TYPE_ORDER, TYPE_PLURALS } from '../../shared/constants';
-import { currentMonthISO, fmtEUR, fmtMonth, fmtPct } from '../../shared/format';
-import { useAppData } from '../api/data';
+import { fmtDate, fmtEUR, fmtMonth, fmtPct } from '../../shared/format';
+import { useAppData, useCurrentCycle } from '../api/data';
+import { Icon as UIIcon } from '../components/ui/Icon';
+import { useNavigate } from 'react-router-dom';
 import { BudgetBars, CategoryBars } from '../components/BudgetBars';
 import { OverrideInput } from '../components/PlanCard';
 import { useQuickAdd } from '../components/QuickAdd';
@@ -28,8 +32,9 @@ const EMPTY_HINTS: Record<string, string> = {
 export function MonthView() {
   const { data, isLoading } = useAppData();
   const { openNew } = useQuickAdd();
+  const navigate = useNavigate();
   const reduced = useReducedMotion();
-  const currentMonth = currentMonthISO();
+  const currentMonth = useCurrentCycle();
   const [month, setMonth] = useState(currentMonth);
   const [dir, setDir] = useState(0);
   const touchX = useRef<number | null>(null);
@@ -53,7 +58,7 @@ export function MonthView() {
   const derived = useMemo(() => {
     if (!data) return null;
     const summary = monthlySummary(data, month);
-    const txs = data.transactions.filter((t) => monthOf(t.date) === month);
+    const txs = data.transactions.filter((t) => keyOf(t.date, data.settings) === month);
     const byType = TYPE_ORDER.map((type) => ({
       type,
       items: txs.filter((t) => t.type === type),
@@ -65,6 +70,8 @@ export function MonthView() {
       summary,
       byType,
       plans,
+      subs: subOccurrencesForCycle(data.subscriptions, month, data.settings),
+      bounds: cycleBounds(month, data.settings),
       budget: budgetVsActualMonth(data, month),
       top: topCategories(data, [month]),
       categories: new Map(data.categories.map((c) => [c.id, c])),
@@ -80,7 +87,7 @@ export function MonthView() {
     );
   }
 
-  const { summary, byType, plans, budget, top, categories } = derived;
+  const { summary, byType, plans, subs, bounds, budget, top, categories } = derived;
   const cards = [
     { label: 'Income', value: summary.income, cls: 'amount--income' },
     { label: 'Expenses', value: summary.expenses, cls: 'amount--expense' },
@@ -102,14 +109,24 @@ export function MonthView() {
     >
       <div className="screen-head">
         <h1 className="screen-title">Months</h1>
-        <div className="month-picker">
-          <button className="icon-btn" onClick={() => go(-1)} aria-label="Previous month">
-            <Icon name="chevronLeft" />
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+          <button className="icon-btn" onClick={() => navigate('/history')} aria-label="History & filters">
+            <UIIcon name="filter" size={17} />
           </button>
-          <span className="month-picker__label" aria-live="polite">{fmtMonth(month)}</span>
-          <button className="icon-btn" onClick={() => go(1)} aria-label="Next month">
-            <Icon name="chevronRight" />
-          </button>
+          <div className="month-picker">
+            <button className="icon-btn" onClick={() => go(-1)} aria-label="Previous month">
+              <Icon name="chevronLeft" />
+            </button>
+            <span style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+              <span className="month-picker__label" aria-live="polite">{fmtMonth(month)}</span>
+              <span className="tx-row__secondary">
+                {fmtDate(bounds.start)} – {fmtDate(bounds.end)}
+              </span>
+            </span>
+            <button className="icon-btn" onClick={() => go(1)} aria-label="Next month">
+              <Icon name="chevronRight" />
+            </button>
+          </div>
         </div>
       </div>
 
@@ -137,8 +154,34 @@ export function MonthView() {
             <div className="stack">
               {byType.map(({ type, items }) => (
                 <Section key={type} title={TYPE_PLURALS[type]}>
-                  {items.length > 0 ? (
-                    <TransactionList transactions={items} categories={categories} />
+                  {items.length > 0 || (type === 'expense' && subs.length > 0) ? (
+                    <div className="tx-scroll">
+                      <TransactionList transactions={items} categories={categories} />
+                      {type === 'expense' &&
+                        subs.map(({ sub, date }) => (
+                          <button
+                            key={`${sub.id}-${date}`}
+                            type="button"
+                            className="tx-row"
+                            onClick={() => navigate('/subscriptions')}
+                            aria-label={`Subscription ${sub.name}, − ${fmtEUR(sub.amount)}`}
+                          >
+                            <span className="tx-row__icon" style={{ background: 'var(--expense-tint)', color: 'var(--expense)' }}>
+                              <UIIcon name="repeat" size={17} />
+                            </span>
+                            <span className="tx-row__text">
+                              <span className="tx-row__primary">{sub.name}</span>
+                              <span className="tx-row__secondary" style={{ display: 'block' }}>
+                                Subscription{sub.categoryId ? ` · ${categories.get(sub.categoryId)?.name ?? ''}` : ''}
+                              </span>
+                            </span>
+                            <span style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 2 }}>
+                              <span className="amount tx-row__amount amount--expense">− {fmtEUR(sub.amount)}</span>
+                              <span className="tx-row__date">{fmtDate(date)}</span>
+                            </span>
+                          </button>
+                        ))}
+                    </div>
                   ) : (
                     <EmptyState
                       message={EMPTY_HINTS[type]}

@@ -7,7 +7,12 @@
 .main {
   max-width: 1200px;
   margin: 0 auto;
-  padding: 20px 16px calc(var(--tabbar-h) + 32px + env(safe-area-inset-bottom));
+  /* safe-area: keep content clear of the notch / Dynamic Island / status bar
+     in standalone PWA mode, portrait and landscape */
+  padding: calc(20px + env(safe-area-inset-top, 0px))
+    max(16px, env(safe-area-inset-right, 0px))
+    calc(var(--tabbar-h) + 32px + env(safe-area-inset-bottom, 0px))
+    max(16px, env(safe-area-inset-left, 0px));
 }
 
 .screen-head {
@@ -158,9 +163,10 @@
 
 /* --- grids ---------------------------------------------------------------------------- */
 
+/* cards fill the available width and only stack when they must */
 .stat-grid {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
   gap: 12px;
 }
 
@@ -170,12 +176,8 @@
   gap: 16px;
 }
 
-@media (min-width: 700px) {
-  .stat-grid { grid-template-columns: repeat(3, 1fr); }
-}
-
 @media (min-width: 1024px) {
-  .stat-grid { grid-template-columns: repeat(6, 1fr); gap: 16px; }
+  .stat-grid { gap: 16px; }
   .chart-grid { grid-template-columns: 1fr 1fr; }
 }
 
@@ -185,11 +187,18 @@
   gap: 24px;
 }
 
-@media (min-width: 1024px) {
+@media (min-width: 800px) {
   .month-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 24px;
     align-items: start;
   }
+}
+
+/* long transaction lists scroll internally instead of growing the page */
+.tx-scroll {
+  max-height: 420px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }

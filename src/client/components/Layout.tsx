@@ -6,8 +6,14 @@ const NAV: { to: string; label: string; icon: IconName }[] = [
   { to: '/', label: 'Dashboard', icon: 'grid' },
   { to: '/months', label: 'Months', icon: 'calendar' },
   { to: '/plans', label: 'Plans', icon: 'layers' },
+  { to: '/subscriptions', label: 'Subscriptions', icon: 'repeat' },
+  { to: '/history', label: 'History', icon: 'filter' },
   { to: '/settings', label: 'Settings', icon: 'gear' },
 ];
+
+// mobile tab bar stays at four items + FAB; Subscriptions and History are
+// reachable from the Plans/Months headers respectively
+const TABS = [NAV[0], NAV[1], NAV[2], NAV[5]];
 
 function BrandMark() {
   return (
@@ -53,7 +59,7 @@ export function Layout() {
       </main>
 
       <nav className="tabbar" aria-label="Main">
-        {NAV.slice(0, 2).map((n) => (
+        {TABS.slice(0, 2).map((n) => (
           <TabItem key={n.to} {...n} />
         ))}
         <div className="tabbar__fab-slot">
@@ -61,7 +67,7 @@ export function Layout() {
             <Icon name="plus" size={24} strokeWidth={2.2} />
           </button>
         </div>
-        {NAV.slice(2).map((n) => (
+        {TABS.slice(2).map((n) => (
           <TabItem key={n.to} {...n} />
         ))}
       </nav>
