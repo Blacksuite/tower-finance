@@ -1,6 +1,7 @@
 // Locale/currency-aware formatting. Defaults to EUR + nl-NL; the client calls
 // configureFormat() with the persisted settings once data loads. All amounts
 // render with tabular numerals via CSS; this module only handles strings.
+import { cycleBounds } from './cycles';
 
 function build(currency: string, locale: string) {
   try {
@@ -50,6 +51,16 @@ export function fmtDate(date: string): string {
 /** "juni 2026" from YYYY-MM */
 export function fmtMonth(month: string): string {
   return f.monthYear.format(parseLocal(`${month}-01`));
+}
+
+/**
+ * Primary label for a salary cycle: the month name when cycles are calendar
+ * months (salaryDay 1), otherwise the actual date range with year.
+ */
+export function fmtCycle(label: string, s: { salaryDay: number; weekendRule: 'previous' | 'exact' | 'next' }): string {
+  if (s.salaryDay === 1) return fmtMonth(label);
+  const { start, end } = cycleBounds(label, s);
+  return `${fmtDate(start)} – ${fmtDate(end)} ${end.slice(0, 4)}`;
 }
 
 /** "jun" / "jun '26" from YYYY-MM, for chart axes */

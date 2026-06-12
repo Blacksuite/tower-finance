@@ -138,7 +138,7 @@ export function Subscriptions() {
                   </span>
                 </div>
                 {s.description && (
-                  <span className="tx-row__secondary">{s.description}</span>
+                  <span className="hint">{s.description}</span>
                 )}
                 <button
                   className="btn btn--sm btn--ghost"

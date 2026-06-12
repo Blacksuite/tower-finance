@@ -23,6 +23,7 @@ export function Segmented<T extends string>({
       {options.map((o) => (
         <button
           key={o.value}
+          type="button" /* inside forms, an untyped button is type=submit */
           role="tab"
           aria-selected={value === o.value}
           className={`segmented__btn${value === o.value ? ' is-active' : ''}`}

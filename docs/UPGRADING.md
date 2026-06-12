@@ -6,16 +6,23 @@ your data survives. The container itself is disposable.
 
 ## Recommended update workflow
 
+The repo lives on GitHub; never copy files around by hand. Easiest path:
+
 ```bash
 cd /path/to/tower-finance
+./scripts/update.sh     # backs up the DB, git pull, rebuild, restart
+```
 
+Or manually:
+
+```bash
 # 1. Back up the database first (always)
 mkdir -p backups
 sqlite3 data/tower.db ".backup backups/tower-$(date +%F).db"
 #    └─ no sqlite3 on the host? stop the stack first, then: cp data/tower.db backups/
 
-# 2. Pull the new version of the source
-git pull            # or copy the new release over the folder (keep ./data!)
+# 2. Pull the new version (source mode)
+git pull --ff-only
 
 # 3. Rebuild and restart — data is untouched because ./data is a volume
 docker compose up -d --build
@@ -24,7 +31,26 @@ docker compose up -d --build
 docker compose logs --tail 5 tower-finance   # "Tower Finance listening on ..."
 ```
 
-Open the app and check the dashboard. Done.
+Open the app and check the dashboard (the running version is shown at the
+bottom of Settings). Done.
+
+### Registry mode (prebuilt images, no local build)
+
+GitHub Actions publishes images to GHCR on every push to `main` and on
+`v*` tags. To consume them instead of building locally, change
+`docker-compose.yml`:
+
+```yaml
+services:
+  tower-finance:
+    image: ghcr.io/<owner>/tower-finance:latest   # or pin :1.1.0
+    # build: .          ← remove/comment the build line
+```
+
+Then updating is just `docker compose pull && docker compose up -d`, and
+**rollback** is pinning the previous tag (e.g. `:1.0.0`) and `up -d` again.
+For a private repo run `docker login ghcr.io` once with a GitHub token
+(`read:packages`).
 
 ## Migrations
 
@@ -52,7 +78,7 @@ If a new version misbehaves:
 
 ```bash
 docker compose down
-git checkout <previous-tag-or-commit>   # or restore the old source folder
+git checkout <previous-tag-or-commit>   # source mode — or pin the image tag
 docker compose up -d --build
 ```
 

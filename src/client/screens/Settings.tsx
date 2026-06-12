@@ -81,6 +81,10 @@ export function Settings() {
       <Section title="Backup">
         <BackupControls />
       </Section>
+
+      <span className="hint" style={{ textAlign: 'center' }}>
+        Tower Finance v{__APP_VERSION__}
+      </span>
     </div>
   );
 }
@@ -121,7 +125,7 @@ function SalaryCycleForm() {
           <option value="next">Next Monday</option>
         </select>
       </div>
-      <span className="tx-row__secondary" style={{ paddingBottom: 12 }}>
+      <span className="hint" style={{ paddingBottom: 12 }}>
         Budget periods run from one salary date to the day before the next.
         This month's salary date: <strong>{fmtDate(example)}</strong>.
       </span>
@@ -158,7 +162,7 @@ function CurrencyForm() {
           onChange={(e) => setLocale(e.target.value)} onBlur={commit}
           onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()} />
       </div>
-      <span className="tx-row__secondary" style={{ paddingBottom: 12 }}>
+      <span className="hint" style={{ paddingBottom: 12 }}>
         e.g. EUR + nl-NL → {fmtEUR(1234.56)}
       </span>
     </div>
@@ -225,7 +229,7 @@ function SecurityForm({ enabled }: { enabled: boolean }) {
           Disable
         </button>
       )}
-      <span className="tx-row__secondary" style={{ width: '100%' }}>
+      <span className="hint" style={{ width: '100%' }}>
         {mismatch
           ? 'Passwords do not match.'
           : enabled
@@ -245,7 +249,7 @@ function TemplateManager({ templates, categories }: { templates: ExpenseTemplate
   return (
     <div>
       {templates.length === 0 && (
-        <span className="tx-row__secondary">
+        <span className="hint">
           Templates pre-fill the quick-add form from a dropdown — handy for routine expenses.
         </span>
       )}
@@ -253,7 +257,7 @@ function TemplateManager({ templates, categories }: { templates: ExpenseTemplate
         <div key={t.id} className="settings-row">
           <span className="settings-row__name" style={{ fontSize: 'var(--text-sm)', fontWeight: 500 }}>
             {t.name}
-            <span className="tx-row__secondary" style={{ display: 'block' }}>
+            <span className="hint" style={{ display: 'block' }}>
               {fmtEUR(t.amount)} · {t.categoryId ? catName.get(t.categoryId) ?? '—' : 'no category'}
               {t.defaultDay ? ` · day ${t.defaultDay}` : ''}
             </span>

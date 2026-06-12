@@ -1,10 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import {
+  CALENDAR,
   cycleBounds,
   cycleKeyOf,
   salaryDate,
   type CycleSettings,
 } from '../src/shared/cycles';
+import { fmtCycle } from '../src/shared/format';
 import {
   monthlySummary,
   netWorthBreakdown,
@@ -63,14 +65,14 @@ describe('cycle mapping', () => {
     expect(cycleBounds('2026-06', DEFAULT_SETTINGS)).toEqual({ start: '2026-06-01', end: '2026-06-30' });
   });
 
-  it('a late salary day labels the cycle after the month it funds', () => {
+  it('cycles are keyed by the month the salary lands in', () => {
     const s = cs(25);
-    // 25 Jun – 24 Jul = "July"
-    expect(cycleBounds('2026-07', s)).toEqual({ start: '2026-06-25', end: '2026-07-24' });
-    expect(cycleKeyOf('2026-06-26', s)).toBe('2026-07');
-    expect(cycleKeyOf('2026-06-24', s)).toBe('2026-06');
-    expect(cycleKeyOf('2026-07-24', s)).toBe('2026-07');
-    expect(cycleKeyOf('2026-07-25', s)).toBe('2026-08');
+    // cycle "2026-06" = 25 Jun – 24 Jul (the June paycheck and what it pays)
+    expect(cycleBounds('2026-06', s)).toEqual({ start: '2026-06-25', end: '2026-07-24' });
+    expect(cycleKeyOf('2026-06-26', s)).toBe('2026-06'); // salary stays in June
+    expect(cycleKeyOf('2026-06-24', s)).toBe('2026-05');
+    expect(cycleKeyOf('2026-07-24', s)).toBe('2026-06');
+    expect(cycleKeyOf('2026-07-25', s)).toBe('2026-07');
   });
 
   it('an early salary day keeps the starting month label', () => {
@@ -82,10 +84,10 @@ describe('cycle mapping', () => {
 
   it('weekend shifting keeps boundaries consistent', () => {
     const s = cs(25, 'previous');
-    const b = cycleBounds('2026-05', s); // pay month apr: 24 Apr (Sat→Fri) .. 24 May (Mon) − 1
-    expect(b.start).toBe('2026-04-24');
-    expect(cycleKeyOf(b.start, s)).toBe('2026-05');
-    expect(cycleKeyOf(b.end, s)).toBe('2026-05');
+    const b = cycleBounds('2026-04', s); // 24 Apr (Sat→Fri) .. day before 25 May (Mon)
+    expect(b).toEqual({ start: '2026-04-24', end: '2026-05-24' });
+    expect(cycleKeyOf(b.start, s)).toBe('2026-04');
+    expect(cycleKeyOf(b.end, s)).toBe('2026-04');
   });
 });
 
@@ -94,15 +96,37 @@ describe('cycle-aware summaries', () => {
     const d = data({
       settings: { salaryDay: 25 },
       transactions: [
-        tx('2026-06-26', 'income', 3000), // salary paid 25 Jun → July cycle
-        tx('2026-07-10', 'expense', 500),
-        tx('2026-06-20', 'expense', 100), // still June cycle
+        tx('2026-06-26', 'income', 3000), // salary paid 25 Jun → June cycle
+        tx('2026-07-10', 'expense', 500), // bill after the deposit → same cycle
+        tx('2026-06-20', 'expense', 100), // before payday → May cycle
       ],
     });
-    const july = monthlySummary(d, '2026-07');
-    expect(july.income).toBe(3000);
-    expect(july.expenses).toBe(500);
-    expect(monthlySummary(d, '2026-06').expenses).toBe(100);
+    const june = monthlySummary(d, '2026-06');
+    expect(june.income).toBe(3000);
+    expect(june.expenses).toBe(500);
+    expect(monthlySummary(d, '2026-05').expenses).toBe(100);
+  });
+
+  it('CALENDAR bucket reports by calendar month regardless of cycles', () => {
+    const d = data({
+      settings: { salaryDay: 26 },
+      transactions: [
+        tx('2026-05-26', 'income', 3000),
+        tx('2026-06-02', 'expense', 500),
+      ],
+    });
+    // cycle view: both belong to the May cycle (26 mei – 25 jun)
+    expect(monthlySummary(d, '2026-05').income).toBe(3000);
+    expect(monthlySummary(d, '2026-05').expenses).toBe(500);
+    // calendar view: income in May, expense in June
+    expect(monthlySummary(d, '2026-05', CALENDAR).expenses).toBe(0);
+    expect(monthlySummary(d, '2026-06', CALENDAR).expenses).toBe(500);
+    expect(monthlySummary(d, '2026-06', CALENDAR).income).toBe(0);
+  });
+
+  it('fmtCycle shows month names for day 1 and date ranges otherwise', () => {
+    expect(fmtCycle('2026-06', { salaryDay: 1, weekendRule: 'exact' })).toBe('juni 2026');
+    expect(fmtCycle('2026-06', { salaryDay: 26, weekendRule: 'exact' })).toBe('26 jun – 25 jul 2026');
   });
 });
 

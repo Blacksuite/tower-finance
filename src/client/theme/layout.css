@@ -5,6 +5,9 @@
 }
 
 .main {
+  /* width:100% is required: as a grid item with auto margins, .main would
+     otherwise shrink to content width on wide screens instead of filling */
+  width: 100%;
   max-width: 1200px;
   margin: 0 auto;
   /* safe-area: keep content clear of the notch / Dynamic Island / status bar
@@ -19,7 +22,8 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
+  flex-wrap: wrap; /* controls drop to their own line on narrow screens */
+  gap: 12px 16px;
   margin-bottom: 20px;
 }
 
@@ -190,7 +194,8 @@
 @media (min-width: 800px) {
   .month-grid {
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    /* minmax(0,…) so nowrap content can't blow the columns out */
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
     gap: 24px;
     align-items: start;
   }
@@ -201,4 +206,6 @@
   max-height: 420px;
   overflow-y: auto;
   overscroll-behavior: contain;
+  padding-right: 6px; /* keep amounts clear of the overlay scrollbar */
+  scrollbar-gutter: stable;
 }

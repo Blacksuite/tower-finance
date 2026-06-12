@@ -41,26 +41,25 @@ export function salaryDate(month: string, s: CycleSettings): string {
 }
 
 /**
- * Cycles paid late in the month fund the NEXT month: the 25 Jun – 24 Jul
- * cycle is labeled "July". Paid on/before the 15th, the cycle keeps the
- * month it starts in. The offset is constant per settings, so labels are
- * consecutive and collision-free.
+ * A cycle is keyed by the month its salary lands in: cycle "2026-06" runs
+ * from salaryDate(2026-06) until the day before salaryDate(2026-07).
+ * Displayed as the actual date range ("26 jun – 25 jul 2026"); with the
+ * default salaryDay 1 a cycle is exactly its calendar month.
  */
-export const cycleOffset = (s: CycleSettings): number => (s.salaryDay > 15 ? 1 : 0);
-
-/** Cycle label (YYYY-MM) that a calendar date falls into. */
 export function cycleKeyOf(date: string, s: CycleSettings): string {
   let pay = addMonths(date.slice(0, 7), 1);
   // walk back to the latest salary date on or before `date` (≤3 steps)
   while (salaryDate(pay, s) > date) pay = addMonths(pay, -1);
-  return addMonths(pay, cycleOffset(s));
+  return pay;
 }
 
-/** Inclusive [start, end] dates of the cycle labeled `label`. */
+/** Inclusive [start, end] dates of the cycle keyed `label`. */
 export function cycleBounds(label: string, s: CycleSettings): { start: string; end: string } {
-  const pay = addMonths(label, -cycleOffset(s));
   return {
-    start: salaryDate(pay, s),
-    end: addDays(salaryDate(addMonths(pay, 1), s), -1),
+    start: salaryDate(label, s),
+    end: addDays(salaryDate(addMonths(label, 1), s), -1),
   };
 }
+
+/** Calendar-month bucketing, used for reporting/trend views. */
+export const CALENDAR: CycleSettings = DEFAULT_CYCLE;

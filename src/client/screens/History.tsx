@@ -130,7 +130,7 @@ export function History() {
           <TransactionList transactions={derived.items} categories={derived.categories} />
         )}
       </Section>
-      <span className="tx-row__secondary" style={{ textAlign: 'center' }}>
+      <span className="hint" style={{ textAlign: 'center' }}>
         Net total uses {TYPE_SIGNS.income === '+' ? '+' : ''}income − everything else. Tap a row to edit.
       </span>
     </div>

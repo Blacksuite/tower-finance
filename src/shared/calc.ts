@@ -139,14 +139,20 @@ function sumByType(transactions: Transaction[], labels: Set<string>, s: CycleSet
   return t;
 }
 
-export function summarize(data: AppData, months: string[]): Summary {
+/**
+ * `bucket` selects how dates map to YYYY-MM keys: the user's salary cycles
+ * (default) or CALENDAR for calendar-month reporting. Plan installments are
+ * keyed YYYY-MM natively, so they are identical under both bucketings.
+ */
+export function summarize(data: AppData, months: string[], bucket?: CycleSettings): Summary {
+  const s = bucket ?? data.settings;
   const set = new Set(months);
-  const t = sumByType(data.transactions, set, data.settings);
+  const t = sumByType(data.transactions, set, s);
   let planExpenses = 0;
   let subscriptionExpenses = 0;
   for (const m of months) {
     planExpenses += planExpensesForMonth(data, m);
-    subscriptionExpenses += subExpensesForCycle(data.subscriptions, m, data.settings).total;
+    subscriptionExpenses += subExpensesForCycle(data.subscriptions, m, s).total;
   }
   const expenses = round2(t.expense + planExpenses + subscriptionExpenses);
   const income = round2(t.income);
@@ -165,26 +171,27 @@ export function summarize(data: AppData, months: string[]): Summary {
   };
 }
 
-export const monthlySummary = (data: AppData, month: string): Summary =>
-  summarize(data, [month]);
+export const monthlySummary = (data: AppData, month: string, bucket?: CycleSettings): Summary =>
+  summarize(data, [month], bucket);
 
 // ---------------------------------------------------------------------------
 // Months with data / active months
 // ---------------------------------------------------------------------------
 
 /** Every cycle that has any data (transactions, plan payments, subscriptions), ascending. */
-export function monthsWithData(data: AppData, currentMonth: string): string[] {
+export function monthsWithData(data: AppData, currentMonth: string, bucket?: CycleSettings): string[] {
+  const s = bucket ?? data.settings;
   const set = new Set<string>();
-  for (const tx of data.transactions) set.add(keyOf(tx.date, data.settings));
+  for (const tx of data.transactions) set.add(keyOf(tx.date, s));
   for (const st of planStates(data, currentMonth)) {
     for (const r of st.rows) if (r.counted > EPS) set.add(r.month);
   }
   for (const sub of data.subscriptions) {
     // subscriptions never extend the axis into the future beyond now
-    let label = keyOf(sub.firstBillDate, data.settings);
-    const stop = sub.endsOn ? keyOf(sub.endsOn, data.settings) : currentMonth;
+    let label = keyOf(sub.firstBillDate, s);
+    const stop = sub.endsOn ? keyOf(sub.endsOn, s) : currentMonth;
     for (let i = 0; label <= stop && label <= currentMonth && i < MAX_SCHEDULE_MONTHS; i++) {
-      if (subExpensesForCycle([sub], label, data.settings).total > EPS) set.add(label);
+      if (subExpensesForCycle([sub], label, s).total > EPS) set.add(label);
       label = addMonths(label, 1);
     }
   }
@@ -192,8 +199,8 @@ export function monthsWithData(data: AppData, currentMonth: string): string[] {
 }
 
 /** Continuous month axis from the first data month through max(last data, current). */
-export function monthAxis(data: AppData, currentMonth: string): string[] {
-  const months = monthsWithData(data, currentMonth);
+export function monthAxis(data: AppData, currentMonth: string, bucket?: CycleSettings): string[] {
+  const months = monthsWithData(data, currentMonth, bucket);
   if (months.length === 0) return [currentMonth];
   const last = months[months.length - 1] > currentMonth ? months[months.length - 1] : currentMonth;
   return monthRange(months[0], last);
@@ -226,15 +233,16 @@ export interface BudgetRow {
   pct: number;
 }
 
-function categoryActuals(data: AppData, months: Set<string>): Map<string, number> {
+function categoryActuals(data: AppData, months: Set<string>, bucket?: CycleSettings): Map<string, number> {
+  const s = bucket ?? data.settings;
   const map = new Map<string, number>();
   for (const tx of data.transactions) {
-    if (tx.type !== 'expense' || !months.has(keyOf(tx.date, data.settings))) continue;
+    if (tx.type !== 'expense' || !months.has(keyOf(tx.date, s))) continue;
     const key = tx.categoryId ?? '';
     map.set(key, (map.get(key) ?? 0) + tx.amount);
   }
   for (const m of months) {
-    for (const [key, amount] of subExpensesForCycle(data.subscriptions, m, data.settings).byCategory) {
+    for (const [key, amount] of subExpensesForCycle(data.subscriptions, m, s).byCategory) {
       map.set(key, (map.get(key) ?? 0) + amount);
     }
   }
@@ -249,9 +257,10 @@ export function budgetVsActual(
   data: AppData,
   months: string[],
   multiplier: number,
+  bucket?: CycleSettings,
 ): BudgetRow[] {
   const set = new Set(months);
-  const actuals = categoryActuals(data, set);
+  const actuals = categoryActuals(data, set, bucket);
   const rows: BudgetRow[] = [];
   const sorted = [...data.categories].sort((a, b) => a.sortOrder - b.sortOrder);
   for (const cat of sorted) {
@@ -267,7 +276,7 @@ export function budgetVsActual(
       pct: budget > EPS ? actual / budget : actual > EPS ? Infinity : 0,
     });
   }
-  const t = sumByType(data.transactions, set, data.settings);
+  const t = sumByType(data.transactions, set, bucket ?? data.settings);
   const targets: Array<['saving' | 'investment', string, number, number]> = [
     ['saving', 'Savings', data.settings.savingsTarget, t.saving],
     ['investment', 'Investments', data.settings.investmentsTarget, t.investment],
@@ -288,8 +297,8 @@ export function budgetVsActual(
   return rows;
 }
 
-export function budgetVsActualMonth(data: AppData, month: string): BudgetRow[] {
-  return budgetVsActual(data, [month], 1);
+export function budgetVsActualMonth(data: AppData, month: string, bucket?: CycleSettings): BudgetRow[] {
+  return budgetVsActual(data, [month], 1, bucket);
 }
 
 export function budgetVsActualYtd(data: AppData, currentMonth: string): BudgetRow[] {
@@ -323,14 +332,14 @@ function liabilitiesAt(data: AppData, label: string): number {
  * Net worth per cycle: starting net worth + cumulative cash flow, minus the
  * outstanding payment-plan balance at that point (plans count as liabilities).
  */
-export function netWorthSeries(data: AppData, currentMonth: string): NetWorthPoint[] {
+export function netWorthSeries(data: AppData, currentMonth: string, bucket?: CycleSettings): NetWorthPoint[] {
   let cash = data.settings.startingNetWorth;
   // future scheduled plan installments are not "paid", so the series stops at
   // the current real month rather than projecting forward
-  return monthAxis(data, currentMonth)
+  return monthAxis(data, currentMonth, bucket)
     .filter((m) => m <= currentMonth)
     .map((month) => {
-      const s = monthlySummary(data, month);
+      const s = monthlySummary(data, month, bucket);
       cash = round2(cash + s.income - s.expenses);
       return { month, value: round2(cash - liabilitiesAt(data, month)) };
     });
@@ -419,8 +428,8 @@ export interface CategorySpend {
   amount: number;
 }
 
-export function topCategories(data: AppData, months: string[]): CategorySpend[] {
-  const actuals = categoryActuals(data, new Set(months));
+export function topCategories(data: AppData, months: string[], bucket?: CycleSettings): CategorySpend[] {
+  const actuals = categoryActuals(data, new Set(months), bucket);
   const byId = new Map(data.categories.map((c) => [c.id, c] as [string, Category]));
   const out: CategorySpend[] = [];
   for (const [id, amount] of actuals) {

@@ -16,7 +16,15 @@ interface Seg {
  * The dashboard hero: income splitting into expenses / savings / investments /
  * left over as one full-width segmented bar, segments growing in from the left.
  */
-export function Ribbon({ summary, netWorth }: { summary: Summary; netWorth?: number }) {
+export function Ribbon({
+  summary,
+  netWorth,
+  periodText,
+}: {
+  summary: Summary;
+  netWorth?: number;
+  periodText?: string;
+}) {
   const reduced = useReducedMotion();
   const { openNew } = useQuickAdd();
   const [hover, setHover] = useState<Seg | null>(null);
@@ -37,11 +45,13 @@ export function Ribbon({ summary, netWorth }: { summary: Summary; netWorth?: num
     <section className="card ribbon-card" aria-label="Cash flow">
       <div className="ribbon__head">
         <div>
-          <div className="label" style={{ marginBottom: 4 }}>Income</div>
+          <div className="label" style={{ marginBottom: 4 }}>
+            Income{periodText ? ` · ${periodText}` : ''}
+          </div>
           <AnimatedAmount value={income} className="amount ribbon__income" />
         </div>
         {hover ? (
-          <div style={{ textAlign: 'right' }} aria-live="polite">
+          <div className="ribbon__aside" aria-live="polite">
             <div className="label" style={{ marginBottom: 4, color: hover.color }}>{hover.label}</div>
             <span className="amount" style={{ fontSize: 'var(--text-lg)' }}>
               {fmtEUR(hover.value)}
@@ -51,7 +61,7 @@ export function Ribbon({ summary, netWorth }: { summary: Summary; netWorth?: num
             </span>
           </div>
         ) : netWorth !== undefined ? (
-          <div style={{ textAlign: 'right' }}>
+          <div className="ribbon__aside">
             <div className="label" style={{ marginBottom: 4 }}>Net worth</div>
             <AnimatedAmount value={netWorth} className="amount" style={{ fontSize: 'var(--text-lg)' }} />
           </div>

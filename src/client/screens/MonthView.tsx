@@ -8,10 +8,10 @@ import {
   planStates,
   topCategories,
 } from '../../shared/calc';
-import { cycleBounds } from '../../shared/cycles';
+import { CALENDAR, cycleBounds, cycleKeyOf } from '../../shared/cycles';
 import { subOccurrencesForCycle } from '../../shared/recurring';
 import { TYPE_ORDER, TYPE_PLURALS } from '../../shared/constants';
-import { fmtDate, fmtEUR, fmtMonth, fmtPct } from '../../shared/format';
+import { fmtCycle, fmtDate, fmtEUR, fmtMonth, fmtPct, todayISO } from '../../shared/format';
 import { useAppData, useCurrentCycle } from '../api/data';
 import { Icon as UIIcon } from '../components/ui/Icon';
 import { useNavigate } from 'react-router-dom';
@@ -20,7 +20,7 @@ import { OverrideInput } from '../components/PlanCard';
 import { useQuickAdd } from '../components/QuickAdd';
 import { TransactionList } from '../components/TransactionList';
 import { Icon } from '../components/ui/Icon';
-import { CardSkeleton, EmptyState, Section } from '../components/ui/primitives';
+import { CardSkeleton, EmptyState, Section, Segmented } from '../components/ui/primitives';
 
 const EMPTY_HINTS: Record<string, string> = {
   income: 'No income yet this month — add your salary or other income.',
@@ -37,7 +37,16 @@ export function MonthView() {
   const currentMonth = useCurrentCycle();
   const [month, setMonth] = useState(currentMonth);
   const [dir, setDir] = useState(0);
+  // budgeting view = salary cycles; calendar view = plain months for review
+  const [view, setView] = useState<'cycle' | 'calendar'>('cycle');
   const touchX = useRef<number | null>(null);
+  const cyclic = (data?.settings.salaryDay ?? 1) !== 1;
+  const bucket = view === 'calendar' ? CALENDAR : data?.settings;
+
+  const switchView = (v: 'cycle' | 'calendar') => {
+    setView(v);
+    setMonth(cycleKeyOf(todayISO(), v === 'calendar' ? CALENDAR : data!.settings));
+  };
 
   const go = (delta: number) => {
     setDir(delta);
@@ -56,9 +65,9 @@ export function MonthView() {
   }, []);
 
   const derived = useMemo(() => {
-    if (!data) return null;
-    const summary = monthlySummary(data, month);
-    const txs = data.transactions.filter((t) => keyOf(t.date, data.settings) === month);
+    if (!data || !bucket) return null;
+    const summary = monthlySummary(data, month, bucket);
+    const txs = data.transactions.filter((t) => keyOf(t.date, bucket) === month);
     const byType = TYPE_ORDER.map((type) => ({
       type,
       items: txs.filter((t) => t.type === type),
@@ -70,13 +79,13 @@ export function MonthView() {
       summary,
       byType,
       plans,
-      subs: subOccurrencesForCycle(data.subscriptions, month, data.settings),
-      bounds: cycleBounds(month, data.settings),
-      budget: budgetVsActualMonth(data, month),
-      top: topCategories(data, [month]),
+      subs: subOccurrencesForCycle(data.subscriptions, month, bucket),
+      bounds: cycleBounds(month, bucket),
+      budget: budgetVsActualMonth(data, month, bucket),
+      top: topCategories(data, [month], bucket),
       categories: new Map(data.categories.map((c) => [c.id, c])),
     };
-  }, [data, month, currentMonth]);
+  }, [data, month, currentMonth, bucket]);
 
   if (isLoading || !derived) {
     return (
@@ -87,7 +96,7 @@ export function MonthView() {
     );
   }
 
-  const { summary, byType, plans, subs, bounds, budget, top, categories } = derived;
+  const { summary, byType, plans, subs, budget, top, categories } = derived;
   const cards = [
     { label: 'Income', value: summary.income, cls: 'amount--income' },
     { label: 'Expenses', value: summary.expenses, cls: 'amount--expense' },
@@ -107,23 +116,35 @@ export function MonthView() {
         if (Math.abs(dx) > 64) go(dx < 0 ? 1 : -1);
       }}
     >
-      <div className="screen-head">
-        <h1 className="screen-title">Months</h1>
+      <div className="screen-head screen-head--wrap">
+        {cyclic ? (
+          <Segmented
+            value={view}
+            onChange={switchView}
+            options={[
+              { value: 'cycle', label: 'Pay cycle' },
+              { value: 'calendar', label: 'Calendar' },
+            ]}
+            ariaLabel="Months view mode"
+          />
+        ) : (
+          <h1 className="screen-title">Months</h1>
+        )}
         <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
           <button className="icon-btn" onClick={() => navigate('/history')} aria-label="History & filters">
             <UIIcon name="filter" size={17} />
           </button>
           <div className="month-picker">
-            <button className="icon-btn" onClick={() => go(-1)} aria-label="Previous month">
+            <button className="icon-btn" onClick={() => go(-1)} aria-label="Previous period">
               <Icon name="chevronLeft" />
             </button>
-            <span style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-              <span className="month-picker__label" aria-live="polite">{fmtMonth(month)}</span>
-              <span className="tx-row__secondary">
-                {fmtDate(bounds.start)} – {fmtDate(bounds.end)}
-              </span>
+            <span
+              className={`month-picker__label${view === 'cycle' && cyclic ? ' month-picker__label--range' : ''}`}
+              aria-live="polite"
+            >
+              {view === 'calendar' || !cyclic ? fmtMonth(month) : fmtCycle(month, data!.settings)}
             </span>
-            <button className="icon-btn" onClick={() => go(1)} aria-label="Next month">
+            <button className="icon-btn" onClick={() => go(1)} aria-label="Next period">
               <Icon name="chevronRight" />
             </button>
           </div>
@@ -205,7 +226,7 @@ export function MonthView() {
                         </span>
                         <OverrideInput planId={st.plan.id} row={row!} />
                       </div>
-                      <span className="tx-row__secondary">
+                      <span className="hint">
                         scheduled {fmtEUR(row!.scheduled)} · {fmtEUR(row!.remainingAfter)} remaining after this month
                       </span>
                     </div>

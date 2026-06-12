@@ -11,7 +11,8 @@ import {
   topCategories,
   type DashboardRange,
 } from '../../shared/calc';
-import { fmtEUR, fmtPct } from '../../shared/format';
+import { CALENDAR, cycleBounds } from '../../shared/cycles';
+import { currentMonthISO, fmtDate, fmtEUR, fmtPct } from '../../shared/format';
 import { useAppData, useCurrentCycle } from '../api/data';
 import { Progress } from '../components/ui/primitives';
 import { BudgetBars, CategoryBars } from '../components/BudgetBars';
@@ -26,8 +27,8 @@ import {
 import { AnimatedAmount, CardSkeleton, Section, Segmented } from '../components/ui/primitives';
 import { useChartColors, useTheme } from '../theme/theme';
 
-const RANGE_OPTIONS: { value: DashboardRange; label: string }[] = [
-  { value: 'month', label: 'This month' },
+const rangeOptions = (cyclic: boolean): { value: DashboardRange; label: string }[] => [
+  { value: 'month', label: cyclic ? 'This cycle' : 'This month' },
   { value: 'ytd', label: 'YTD' },
   { value: 'all', label: 'All time' },
 ];
@@ -43,12 +44,19 @@ export function Dashboard() {
     if (!data) return null;
     const months = rangeMonths(data, range, currentMonth);
     const summary = summarize(data, months);
-    const axis = monthAxis(data, currentMonth).filter((m) => m <= currentMonth);
-    const series: MonthDatum[] = axis.map((m) => ({ month: m, ...monthlySummary(data, m) }));
+    // trend charts report by true calendar months; ribbon/stats/budgets by cycle
+    const calNow = currentMonthISO();
+    const axis = monthAxis(data, calNow, CALENDAR).filter((m) => m <= calNow);
+    const series: MonthDatum[] = axis.map((m) => ({ month: m, ...monthlySummary(data, m, CALENDAR) }));
+    const periodText =
+      months.length > 0
+        ? `${fmtDate(cycleBounds(months[0], data.settings).start)} – ${fmtDate(cycleBounds(months[months.length - 1], data.settings).end)}`
+        : undefined;
     return {
       summary,
+      periodText,
       series,
-      netWorth: netWorthSeries(data, currentMonth),
+      netWorth: netWorthSeries(data, calNow, CALENDAR),
       breakdown: netWorthBreakdown(data, currentMonth),
       plansAgg: planAggregate(data, currentMonth),
       top: topCategories(data, months),
@@ -69,7 +77,7 @@ export function Dashboard() {
     );
   }
 
-  const { summary, series, netWorth, breakdown, plansAgg, top, budgetYtd } = derived;
+  const { summary, periodText, series, netWorth, breakdown, plansAgg, top, budgetYtd } = derived;
 
   const stats: { label: string; value: number; cls?: string; format?: (n: number) => string }[] = [
     { label: 'Total income', value: summary.income, cls: 'amount--income' },
@@ -84,10 +92,15 @@ export function Dashboard() {
     <div className="stack">
       <div className="screen-head">
         <h1 className="screen-title">Dashboard</h1>
-        <Segmented value={range} onChange={setRange} options={RANGE_OPTIONS} ariaLabel="Dashboard range" />
+        <Segmented
+          value={range}
+          onChange={setRange}
+          options={rangeOptions((data?.settings.salaryDay ?? 1) !== 1)}
+          ariaLabel="Dashboard range"
+        />
       </div>
 
-      <Ribbon summary={summary} netWorth={breakdown.total} />
+      <Ribbon summary={summary} netWorth={breakdown.total} periodText={periodText} />
 
       <div className="stat-grid">
         {stats.map((s) => (

@@ -18,12 +18,19 @@
   display: flex;
   align-items: baseline;
   justify-content: space-between;
-  gap: 16px;
+  flex-wrap: wrap; /* net worth drops below income on narrow screens */
+  gap: 8px 16px;
   margin-bottom: 20px;
 }
 
+.ribbon__aside {
+  text-align: right;
+  margin-left: auto;
+  min-width: 0;
+}
+
 .ribbon__income {
-  font-size: var(--text-2xl);
+  font-size: clamp(28px, 9vw, 40px);
   font-weight: 700;
   letter-spacing: -0.02em;
 }
@@ -157,6 +164,7 @@
 }
 
 .tx-row__primary {
+  display: block; /* ellipsis only clips block-level boxes */
   font-size: var(--text-sm);
   font-weight: 500;
   white-space: nowrap;
@@ -217,18 +225,24 @@
   display: flex;
   align-items: baseline;
   justify-content: space-between;
-  gap: 12px;
+  flex-wrap: wrap;
+  gap: 2px 12px;
 }
 
 .budget-row__name {
   font-size: var(--text-sm);
   font-weight: 500;
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .budget-row__nums {
   display: flex;
   align-items: baseline;
-  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  margin-left: auto;
+  gap: 2px 10px;
 }
 
 .budget-row__delta {
@@ -407,7 +421,8 @@
 }
 
 .segmented__btn {
-  flex: 1;
+  flex: 1 1 auto; /* size from label, shrink (with ellipsis) when cramped */
+  min-width: 0;
   min-height: 36px;
   padding: 0 14px;
   border-radius: 7px;
@@ -415,7 +430,13 @@
   font-weight: 500;
   color: var(--muted);
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   transition: background var(--dur) var(--ease), color var(--dur) var(--ease);
+}
+
+@media (max-width: 420px) {
+  .segmented__btn { padding: 0 9px; font-size: 13px; }
 }
 
 .segmented__btn.is-active {
@@ -441,6 +462,14 @@
   font-size: var(--text-md);
   font-weight: 600;
   text-transform: capitalize;
+}
+
+/* date-range labels ("26 jun – 25 jul 2026") are longer: smaller type, no cap */
+.month-picker__label--range {
+  font-size: var(--text-sm);
+  text-transform: none;
+  min-width: 0;
+  white-space: nowrap;
 }
 
 .icon-btn {

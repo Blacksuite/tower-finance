@@ -5,6 +5,9 @@ import { VitePWA } from 'vite-plugin-pwa';
 export default defineConfig({
   root: 'src/client',
   publicDir: 'public',
+  define: {
+    __APP_VERSION__: JSON.stringify(process.env.npm_package_version ?? 'dev'),
+  },
   build: {
     outDir: '../../dist/client',
     emptyOutDir: true,
