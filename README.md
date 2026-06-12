@@ -10,9 +10,35 @@ locale are configurable (defaults: EUR / nl-NL).
 
 Upgrading an existing install? See [docs/UPGRADING.md](docs/UPGRADING.md).
 
-## Run on Unraid (or any Docker host)
+## Quick start — prebuilt image (recommended)
+
+No cloning or building needed. Create a `docker-compose.yml`:
+
+```yaml
+services:
+  tower-finance:
+    image: ghcr.io/blacksuite/tower-finance:latest
+    container_name: tower-finance
+    ports:
+      - "3210:3210"
+    volumes:
+      - ./data:/app/data
+    restart: unless-stopped
+```
 
 ```bash
+docker compose up -d          # first deploy
+docker compose pull && docker compose up -d   # every update
+```
+
+Pin a version tag (e.g. `:1.1.0`) instead of `latest` if you prefer explicit
+upgrades — rolling back is pointing at the previous tag. Tools like Watchtower
+or Unraid's built-in container update check work out of the box.
+
+## Run from source (build locally)
+
+```bash
+git clone https://github.com/Blacksuite/tower-finance && cd tower-finance
 docker compose up -d --build
 ```
 
@@ -54,3 +80,7 @@ Stack: React + Vite + TypeScript, Hono + better-sqlite3, Recharts,
 framer-motion, vite-plugin-pwa. All domain math (monthly summaries, budget vs
 actual, the payment-plan cascade, net worth) lives in `src/shared/calc.ts`
 with tests in `tests/`.
+
+## License
+
+[MIT](LICENSE) — free and open source.
