@@ -50,8 +50,16 @@ export function Ribbon({
           </div>
           <AnimatedAmount value={income} className="amount ribbon__income" />
         </div>
-        {hover ? (
-          <div className="ribbon__aside" aria-live="polite">
+        {netWorth !== undefined && (
+          <div className="ribbon__aside" style={{ opacity: hover ? 0 : 1, transition: 'opacity 120ms ease-out' }}>
+            <div className="label" style={{ marginBottom: 4 }}>Net worth</div>
+            <AnimatedAmount value={netWorth} className="amount" style={{ fontSize: 'var(--text-lg)' }} />
+          </div>
+        )}
+        {/* absolutely positioned so showing it never reflows the card —
+            otherwise the bar shifts under the pointer and hover flickers */}
+        {hover && (
+          <div className="ribbon__hoverinfo" aria-live="polite">
             <div className="label" style={{ marginBottom: 4, color: hover.color }}>{hover.label}</div>
             <span className="amount" style={{ fontSize: 'var(--text-lg)' }}>
               {fmtEUR(hover.value)}
@@ -60,12 +68,7 @@ export function Ribbon({
               </span>
             </span>
           </div>
-        ) : netWorth !== undefined ? (
-          <div className="ribbon__aside">
-            <div className="label" style={{ marginBottom: 4 }}>Net worth</div>
-            <AnimatedAmount value={netWorth} className="amount" style={{ fontSize: 'var(--text-lg)' }} />
-          </div>
-        ) : null}
+        )}
       </div>
 
       {hasData ? (

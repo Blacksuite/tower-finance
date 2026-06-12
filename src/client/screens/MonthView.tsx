@@ -131,9 +131,6 @@ export function MonthView() {
           <h1 className="screen-title">Months</h1>
         )}
         <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-          <button className="icon-btn" onClick={() => navigate('/history')} aria-label="History & filters">
-            <UIIcon name="filter" size={17} />
-          </button>
           <div className="month-picker">
             <button className="icon-btn" onClick={() => go(-1)} aria-label="Previous period">
               <Icon name="chevronLeft" />

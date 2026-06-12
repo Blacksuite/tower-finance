@@ -1,18 +1,61 @@
 # Tower Finance
 
-Self-hosted personal finance PWA: manual transaction entry, salary-cycle
-budgeting (periods run from payday to payday, with weekend handling),
-subscriptions and recurring expense templates, payment plans with
-auto-scheduling, net worth tracking with asset/liability breakdown, transaction
-history filters, and a cash-flow dashboard. Single user, designed for LAN use.
-Optional password protection (managed in Settings, no env vars). Currency and
-locale are configurable (defaults: EUR / nl-NL).
+**Self-hosted budgeting that follows your payday, not the calendar.**
 
-Upgrading an existing install? See [docs/UPGRADING.md](docs/UPGRADING.md).
+Most budget apps assume your month starts on the 1st. Real life starts when
+your salary lands — the 26th, the 25th, the last Friday before a weekend. Tower
+Finance budgets in **pay cycles** (payday → day before next payday) so your
+income and the bills it pays always live in the same period, while reports and
+trends stay available per calendar month.
 
-## Quick start — prebuilt image (recommended)
+It's a single small Docker container with one SQLite file. No cloud, no bank
+logins, no accounts, no telemetry. Your financial data never leaves your
+server.
 
-No cloning or building needed. Create a `docker-compose.yml`:
+## Why this exists
+
+This started as a replacement for a personal Excel budget workbook. Spreadsheet
+budgeting works, but every month means copying formulas, retyping fixed costs,
+and squinting at rows. Tower Finance keeps the parts that made the spreadsheet
+good — full manual control, everything visible, no magic imports — and
+automates the rest.
+
+## Features
+
+- **Pay-cycle budgeting** — set your salary day and a weekend rule (previous
+  Friday / exact / next Monday). Periods run payday to payday and are labeled
+  by their real date range ("26 Jun – 25 Jul"). Default is plain calendar
+  months if that's your thing.
+- **Calendar-month reporting** — trend charts (cash flow, income allocation,
+  savings rate, net worth) report by true calendar months, and every chart says
+  which logic it uses. A toggle on the Months page switches between views.
+- **Fast manual entry** — quick-add sheet with a numeric keypad, category chips
+  sorted by your usage, and reusable expense templates. Routine expense ≈ 3 taps.
+- **Subscriptions** — define them once (monthly/quarterly/yearly); they count
+  toward expenses and budgets automatically every cycle. Pausing keeps history.
+- **Payment plans** — installment purchases with an auto-scheduling cascade:
+  override any month's payment (including 0 to skip) and the rest of the
+  schedule reflows; the final installment self-adjusts.
+- **Budgets** — per-category budgets vs actuals as progress bars, monthly and
+  YTD (scaled by the cycles you actually used), plus savings/investment targets.
+- **Net worth** — cash, savings and investments per account, outstanding plan
+  balances as liabilities, and a trend line.
+- **History & filters** — every transaction filterable by cycle, week, month,
+  year, custom range, category, and type.
+- **Optional password protection** — scrypt-hashed password, httpOnly cookie
+  sessions, login rate limiting, one-tap lock. Managed entirely in Settings; no
+  environment variables. The API serves nothing without a valid session.
+- **Installable PWA** — add it to your phone's home screen and it opens
+  fullscreen like a native app. (Live data needs your server to be reachable —
+  financial data is deliberately never cached in the browser.)
+- **Backups you can trust** — everything is one SQLite file; one-click JSON
+  export/import is built in.
+- Dark + light theme, EUR/nl-NL defaults with configurable currency/locale,
+  in-app update notifications.
+
+## Quick start
+
+Prebuilt image (recommended) — create a `docker-compose.yml`:
 
 ```yaml
 services:
@@ -27,43 +70,32 @@ services:
 ```
 
 ```bash
-docker compose up -d          # first deploy
-docker compose pull && docker compose up -d   # every update
+docker compose up -d
 ```
 
-Pin a version tag (e.g. `:1.1.0`) instead of `latest` if you prefer explicit
-upgrades — rolling back is pointing at the previous tag. Tools like Watchtower
-or Unraid's built-in container update check work out of the box.
+Open `http://<server-ip>:3210`. Updating is `docker compose pull && docker
+compose up -d`; pin a version tag (e.g. `:1.1.0`) for explicit upgrades and
+trivial rollbacks. Watchtower and Unraid's built-in update check both work.
 
-## Run from source (build locally)
+Or build from source:
 
 ```bash
 git clone https://github.com/Blacksuite/tower-finance && cd tower-finance
 docker compose up -d --build
 ```
 
-Open `http://<server-ip>:3210`. On a phone, use "Add to Home Screen" — the app
-installs as a fullscreen PWA and opens instantly offline.
+Tower Finance is designed for a single user on a trusted network (home LAN,
+VPN, or behind your own reverse proxy). If you expose it to the internet, put
+it behind HTTPS and enable the password.
 
-- The image builds locally; no registry or env vars needed.
-- Port mapping is `3210:3210` (change the left side in `docker-compose.yml` if needed).
-- Reverse-proxy the single HTTP port however you like.
+## Your data
 
-## Where the data lives
-
-All data is a single SQLite database at **`./data/tower.db`** (mounted into the
-container at `/app/data`). It survives container rebuilds and updates.
-
-## Backups
-
-Two options:
-
-1. **File copy** — stop the container (or just copy live; WAL mode keeps it
-   consistent enough for a personal setup): `cp data/tower.db backups/`.
-   For a guaranteed-consistent copy while running:
-   `sqlite3 data/tower.db ".backup backups/tower-$(date +%F).db"`.
-2. **In-app JSON export** — Settings → Backup → *Export JSON* downloads the
-   entire database as one JSON file; *Import JSON* restores it (replaces all data).
+One SQLite database at `./data/tower.db`, mounted into the container. Back it
+up by copying the file (`sqlite3 data/tower.db ".backup ..."` for a live copy)
+or via Settings → Backup → Export JSON. Upgrades never touch the data volume
+and schema migrations run automatically — see
+[docs/UPGRADING.md](docs/UPGRADING.md) for the full backup → update → rollback
+workflow.
 
 ## Development
 
@@ -71,15 +103,14 @@ Two options:
 npm install
 npm run dev:server   # API on :3210 (SQLite in ./data)
 npm run dev          # Vite dev server on :5173, proxies /api
-npm test             # unit tests for the calculation engine + API
+npm test             # unit tests for the calculation engine + API + auth
 npm run build        # production build (client + server + PWA icons)
-npm start            # serve the production build on :3210
 ```
 
-Stack: React + Vite + TypeScript, Hono + better-sqlite3, Recharts,
-framer-motion, vite-plugin-pwa. All domain math (monthly summaries, budget vs
-actual, the payment-plan cascade, net worth) lives in `src/shared/calc.ts`
-with tests in `tests/`.
+React + Vite + TypeScript, Hono + better-sqlite3, Recharts, framer-motion.
+All financial math lives in one pure, fully-tested module
+(`src/shared/calc.ts`): pay-cycle mapping, the plan cascade, budget math,
+net worth. Issues and PRs welcome.
 
 ## License
 

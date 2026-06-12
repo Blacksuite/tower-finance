@@ -71,6 +71,11 @@ export function createDb(file: string) {
       frequency TEXT NOT NULL CHECK (frequency IN ('monthly','quarterly','yearly')),
       ends_on TEXT
     );
+    CREATE TABLE IF NOT EXISTS sessions (
+      token_hash TEXT PRIMARY KEY,
+      created_at TEXT NOT NULL,
+      last_seen TEXT NOT NULL
+    );
     CREATE TABLE IF NOT EXISTS templates (
       id TEXT PRIMARY KEY,
       name TEXT NOT NULL,
@@ -156,6 +161,30 @@ export function readAuthHash(db: DB): string | null {
     | { value: string }
     | undefined;
   return row?.value || null;
+}
+
+// --- sessions (token hashes only; raw tokens live in httpOnly cookies) -------
+
+export function insertSession(db: DB, tokenHash: string) {
+  // opportunistic pruning keeps the table tiny
+  db.prepare("DELETE FROM sessions WHERE created_at < datetime('now', '-180 day')").run();
+  db.prepare(
+    "INSERT OR REPLACE INTO sessions (token_hash, created_at, last_seen) VALUES (?, datetime('now'), datetime('now'))",
+  ).run(tokenHash);
+}
+
+export function sessionExists(db: DB, tokenHash: string): boolean {
+  const row = db.prepare('SELECT 1 FROM sessions WHERE token_hash = ?').get(tokenHash);
+  if (row) db.prepare("UPDATE sessions SET last_seen = datetime('now') WHERE token_hash = ?").run(tokenHash);
+  return !!row;
+}
+
+export function deleteSession(db: DB, tokenHash: string) {
+  db.prepare('DELETE FROM sessions WHERE token_hash = ?').run(tokenHash);
+}
+
+export function clearSessions(db: DB) {
+  db.prepare('DELETE FROM sessions').run();
 }
 
 export function writeAuthHash(db: DB, hash: string | null) {

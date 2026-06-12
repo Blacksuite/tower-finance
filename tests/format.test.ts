@@ -17,11 +17,11 @@ describe('nl-NL formatting', () => {
   });
 
   it('formats dates as "11 jun"', () => {
-    expect(fmtDate('2026-06-11')).toBe('11 jun');
+    expect(fmtDate('2026-06-11')).toBe('11 Jun');
   });
 
   it('formats months as "juni 2026"', () => {
-    expect(fmtMonth('2026-06')).toBe('juni 2026');
+    expect(fmtMonth('2026-06')).toBe('June 2026');
   });
 
   it('formats percentages and guards non-finite ratios', () => {

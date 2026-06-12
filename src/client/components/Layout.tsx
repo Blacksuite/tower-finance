@@ -1,5 +1,8 @@
+import { useQueryClient } from '@tanstack/react-query';
 import { NavLink, Outlet } from 'react-router-dom';
+import { lockApp, useAppData } from '../api/data';
 import { Icon, type IconName } from './ui/Icon';
+import { UpdateBanner } from './UpdateBanner';
 import { useQuickAdd } from './QuickAdd';
 
 const NAV: { to: string; label: string; icon: IconName }[] = [
@@ -11,9 +14,9 @@ const NAV: { to: string; label: string; icon: IconName }[] = [
   { to: '/settings', label: 'Settings', icon: 'gear' },
 ];
 
-// mobile tab bar stays at four items + FAB; Subscriptions and History are
-// reachable from the Plans/Months headers respectively
-const TABS = [NAV[0], NAV[1], NAV[2], NAV[5]];
+// Mobile tab bar: four destinations + the FAB. Settings lives in the top bar
+// (gear), Subscriptions in the labeled Plans ⇄ Subscriptions switcher.
+const TABS = [NAV[0], NAV[1], NAV[2], NAV[4]];
 
 function BrandMark() {
   return (
@@ -26,8 +29,20 @@ function BrandMark() {
   );
 }
 
+/** Revokes this device's session; the next fetch returns 401 → login gate. */
+function useLock() {
+  const qc = useQueryClient();
+  return async () => {
+    await lockApp();
+    await qc.refetchQueries({ queryKey: ['bootstrap'] });
+  };
+}
+
 export function Layout() {
   const { openNew } = useQuickAdd();
+  const { data } = useAppData();
+  const lock = useLock();
+  const authEnabled = data?.auth.enabled ?? false;
 
   return (
     <div className="app">
@@ -51,10 +66,36 @@ export function Layout() {
           <Icon name="plus" size={16} />
           Add transaction
         </button>
-        <div className="sidebar__foot">The-Tower · local</div>
+        <div className="sidebar__foot">
+          {authEnabled && (
+            <button className="sidebar__item" style={{ width: '100%' }} onClick={lock}>
+              <Icon name="lock" size={16} />
+              Lock app
+            </button>
+          )}
+          <span style={{ padding: '8px 12px', display: 'block' }}>v{__APP_VERSION__}</span>
+        </div>
       </nav>
 
+      <header className="topbar">
+        <span className="topbar__brand">
+          <BrandMark />
+          Tower
+        </span>
+        <span className="topbar__actions">
+          {authEnabled && (
+            <button className="icon-btn" onClick={lock} aria-label="Lock app">
+              <Icon name="lock" size={18} />
+            </button>
+          )}
+          <NavLink to="/settings" className="icon-btn" aria-label="Settings">
+            <Icon name="gear" size={18} />
+          </NavLink>
+        </span>
+      </header>
+
       <main className="main">
+        <UpdateBanner />
         <Outlet />
       </main>
 

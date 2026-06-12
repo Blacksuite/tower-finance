@@ -3,15 +3,21 @@
 // render with tabular numerals via CSS; this module only handles strings.
 import { cycleBounds } from './cycles';
 
+// Dates always use English month names to match the (English) UI; the
+// locale setting only affects number/currency formatting.
+const DATE_LOCALE = 'en-GB';
+const dates = {
+  dayMonth: new Intl.DateTimeFormat(DATE_LOCALE, { day: 'numeric', month: 'short' }),
+  monthYear: new Intl.DateTimeFormat(DATE_LOCALE, { month: 'long', year: 'numeric' }),
+  monthShort: new Intl.DateTimeFormat(DATE_LOCALE, { month: 'short' }),
+};
+
 function build(currency: string, locale: string) {
   try {
     return {
       eur: new Intl.NumberFormat(locale, { style: 'currency', currency, minimumFractionDigits: 2, maximumFractionDigits: 2 }),
       eurWhole: new Intl.NumberFormat(locale, { style: 'currency', currency, minimumFractionDigits: 0, maximumFractionDigits: 0 }),
       pct: new Intl.NumberFormat(locale, { maximumFractionDigits: 1 }),
-      dayMonth: new Intl.DateTimeFormat(locale, { day: 'numeric', month: 'short' }),
-      monthYear: new Intl.DateTimeFormat(locale, { month: 'long', year: 'numeric' }),
-      monthShort: new Intl.DateTimeFormat(locale, { month: 'short' }),
     };
   } catch {
     return build('EUR', 'nl-NL'); // invalid user input falls back to defaults
@@ -43,14 +49,14 @@ export function fmtPct(ratio: number): string {
   return `${f.pct.format(ratio * 100)}%`;
 }
 
-/** "11 jun" from YYYY-MM-DD */
+/** "11 Jun" from YYYY-MM-DD */
 export function fmtDate(date: string): string {
-  return f.dayMonth.format(parseLocal(date));
+  return dates.dayMonth.format(parseLocal(date));
 }
 
-/** "juni 2026" from YYYY-MM */
+/** "June 2026" from YYYY-MM */
 export function fmtMonth(month: string): string {
-  return f.monthYear.format(parseLocal(`${month}-01`));
+  return dates.monthYear.format(parseLocal(`${month}-01`));
 }
 
 /**
@@ -65,7 +71,7 @@ export function fmtCycle(label: string, s: { salaryDay: number; weekendRule: 'pr
 
 /** "jun" / "jun '26" from YYYY-MM, for chart axes */
 export function fmtMonthTick(month: string, withYear = false): string {
-  const m = f.monthShort.format(parseLocal(`${month}-01`)).replace('.', '');
+  const m = dates.monthShort.format(parseLocal(`${month}-01`)).replace('.', '');
   return withYear ? `${m} '${month.slice(2, 4)}` : m;
 }
 

@@ -1,7 +1,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import { Route, BrowserRouter, Routes, useLocation } from 'react-router-dom';
-import { setAuthKey, useAppData } from './api/data';
+import { useAppData } from './api/data';
 import { configureFormat } from '../shared/format';
 import { History } from './screens/History';
 import { Subscriptions } from './screens/Subscriptions';
@@ -25,14 +25,13 @@ function PasswordGate({ children }: { children: React.ReactNode }) {
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
+    // success sets the httpOnly session cookie; nothing is stored client-side
     const res = await fetch('/api/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ password: pw }),
     });
     if (res.ok) {
-      const { token } = (await res.json()) as { token: string | null };
-      setAuthKey(token ?? '');
       setPw('');
       refetch();
     } else {
@@ -73,7 +72,12 @@ export function App() {
     () =>
       new QueryClient({
         defaultOptions: {
-          queries: { retry: 1, refetchOnWindowFocus: false },
+          queries: {
+            // a 401 means locked — show the gate immediately, never retry it
+            retry: (failureCount, error) =>
+              (error as { status?: number })?.status !== 401 && failureCount < 1,
+            refetchOnWindowFocus: false,
+          },
         },
       }),
   );

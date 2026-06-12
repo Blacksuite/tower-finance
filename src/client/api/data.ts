@@ -19,17 +19,18 @@ import { useToast } from '../components/ui/Toast';
 
 const KEY = ['bootstrap'];
 
-const KEY_STORE = 'tower-key';
-export const getAuthKey = () => localStorage.getItem(KEY_STORE) ?? '';
-export const setAuthKey = (k: string) => localStorage.setItem(KEY_STORE, k);
+// Sessions live in an httpOnly cookie set by the server — nothing auth-related
+// is ever kept in localStorage (the legacy key is removed for old installs).
+try {
+  localStorage.removeItem('tower-key');
+} catch {
+  /* storage unavailable */
+}
 
 async function api<T>(method: string, path: string, body?: unknown): Promise<T> {
   const res = await fetch(`/api${path}`, {
     method,
-    headers: {
-      'x-tower-key': getAuthKey(),
-      ...(body !== undefined ? { 'Content-Type': 'application/json' } : {}),
-    },
+    headers: body !== undefined ? { 'Content-Type': 'application/json' } : undefined,
     body: body !== undefined ? JSON.stringify(body) : undefined,
   });
   if (!res.ok) {
@@ -200,11 +201,14 @@ export function useDeleteTemplate() {
   );
 }
 
-/** Enable / change / disable the password. Stores the rotated session token. */
+/** Enable / change / disable the password (server rotates the session cookie). */
 export async function manageAuth(body: { current?: string; next?: string; enabled: boolean }) {
-  const res = await api<{ enabled: boolean; token: string | null }>('POST', '/auth', body);
-  setAuthKey(res.token ?? '');
-  return res;
+  return api<{ enabled: boolean }>('POST', '/auth', body);
+}
+
+/** Lock / sign out: revoke this device's session; the next fetch hits the gate. */
+export async function lockApp() {
+  await fetch('/api/logout', { method: 'POST' }).catch(() => {});
 }
 
 export type PlanInput = Omit<PaymentPlan, 'id'>;

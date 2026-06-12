@@ -36,19 +36,12 @@ export default defineConfig({
         ],
       },
       workbox: {
+        // Precache the app shell only. Financial API responses are NEVER
+        // cached by the service worker — /api requests always go to network.
         globPatterns: ['**/*.{js,css,html,png,svg,woff2}'],
         navigateFallback: 'index.html',
         navigateFallbackDenylist: [/^\/api\//],
-        runtimeCaching: [
-          {
-            urlPattern: /^\/api\//,
-            handler: 'NetworkFirst',
-            options: {
-              cacheName: 'api-cache',
-              networkTimeoutSeconds: 5,
-            },
-          },
-        ],
+        cleanupOutdatedCaches: true,
       },
     }),
   ],

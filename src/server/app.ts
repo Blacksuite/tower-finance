@@ -1,10 +1,22 @@
-import { Hono } from 'hono';
-import { randomBytes, randomUUID, scryptSync, timingSafeEqual } from 'node:crypto';
+import { Hono, type Context } from 'hono';
+import { deleteCookie, getCookie, setCookie } from 'hono/cookie';
+import { createHash, randomBytes, randomUUID, scryptSync, timingSafeEqual } from 'node:crypto';
 import { z } from 'zod';
 import type { DB } from './db';
-import { readAll, readAuthHash, readSettings, replaceAll, writeAuthHash, writeSettings } from './db';
+import {
+  clearSessions,
+  deleteSession,
+  insertSession,
+  readAll,
+  readAuthHash,
+  readSettings,
+  replaceAll,
+  sessionExists,
+  writeAuthHash,
+  writeSettings,
+} from './db';
 
-// --- password hashing ---------------------------------------------------------
+// --- password hashing & sessions ----------------------------------------------
 
 function hashPassword(pw: string): string {
   const salt = randomBytes(16).toString('hex');
@@ -19,11 +31,33 @@ function verifyPassword(pw: string, stored: string): boolean {
   return candidate.length === expected.length && timingSafeEqual(candidate, expected);
 }
 
-function tokenMatches(token: string | undefined, stored: string): boolean {
-  if (!token) return false;
-  const a = Buffer.from(token);
-  const b = Buffer.from(stored);
-  return a.length === b.length && timingSafeEqual(a, b);
+const SESSION_COOKIE = 'tower_session';
+const SESSION_DAYS = 180;
+const sha256 = (s: string) => createHash('sha256').update(s).digest('hex');
+
+// brute-force throttle for the auth endpoints (in-memory, per process)
+const ATTEMPT_WINDOW_MS = 15 * 60 * 1000;
+const MAX_ATTEMPTS = 10;
+const attempts = new Map<string, { count: number; windowStart: number }>();
+
+function clientKey(c: { req: { header: (n: string) => string | undefined } }): string {
+  return c.req.header('x-forwarded-for')?.split(',')[0]?.trim() || 'local';
+}
+
+function rateLimited(key: string): boolean {
+  const a = attempts.get(key);
+  if (!a || Date.now() - a.windowStart > ATTEMPT_WINDOW_MS) return false;
+  return a.count >= MAX_ATTEMPTS;
+}
+
+function recordFailure(key: string) {
+  const now = Date.now();
+  const a = attempts.get(key);
+  if (!a || now - a.windowStart > ATTEMPT_WINDOW_MS) {
+    attempts.set(key, { count: 1, windowStart: now });
+  } else {
+    a.count++;
+  }
 }
 
 // --- validation schemas ------------------------------------------------------
@@ -150,29 +184,61 @@ export function createApp(db: DB) {
   const app = new Hono();
   const api = new Hono();
 
-  // Optional password protection. The session token is the stored hash; it is
-  // kept in the DB (settings key auth_hash) and never exported or bootstrapped.
+  // Optional password protection. Sessions are random 32-byte tokens delivered
+  // as an httpOnly cookie; only their SHA-256 is stored server-side. No /api
+  // route returns data without a valid session while protection is enabled.
   api.use('*', async (c, next) => {
     const stored = readAuthHash(db);
-    if (!stored || c.req.path === '/api/login') return next();
-    if (!tokenMatches(c.req.header('x-tower-key'), stored)) {
-      return c.json({ error: 'unauthorized' }, 401);
-    }
-    return next();
+    if (!stored) return next();
+    const path = c.req.path;
+    if (path === '/api/login' || path === '/api/logout') return next();
+    const token = getCookie(c, SESSION_COOKIE);
+    if (token && sessionExists(db, sha256(token))) return next();
+    return c.json({ error: 'unauthorized' }, 401);
   });
 
+  const startSession = (c: Context) => {
+    const token = randomBytes(32).toString('hex');
+    insertSession(db, sha256(token));
+    setCookie(c, SESSION_COOKIE, token, {
+      httpOnly: true,
+      sameSite: 'Lax',
+      path: '/',
+      maxAge: 60 * 60 * 24 * SESSION_DAYS,
+    });
+  };
+
   api.post('/login', async (c) => {
+    const key = clientKey(c);
+    if (rateLimited(key)) {
+      return c.json({ error: 'too many attempts — try again in a few minutes' }, 429);
+    }
     const body = (await c.req.json().catch(() => ({}))) as { password?: string };
     const stored = readAuthHash(db);
-    if (!stored) return c.json({ token: null });
+    if (!stored) return c.json({ ok: true }); // protection disabled: nothing to unlock
     if (typeof body.password === 'string' && verifyPassword(body.password, stored)) {
-      return c.json({ token: stored });
+      attempts.delete(key);
+      startSession(c);
+      return c.json({ ok: true });
     }
+    recordFailure(key);
     return c.json({ error: 'wrong password' }, 401);
+  });
+
+  // lock / sign out: revoke this session and drop the cookie
+  api.post('/logout', (c) => {
+    const token = getCookie(c, SESSION_COOKIE);
+    if (token) deleteSession(db, sha256(token));
+    deleteCookie(c, SESSION_COOKIE, { path: '/' });
+    return c.json({ ok: true });
   });
 
   // enable / change / disable the password (requires a valid session when enabled)
   api.post('/auth', async (c) => {
+    const key = clientKey(c);
+    if (rateLimited(key)) {
+      return c.json({ error: 'too many attempts — try again in a few minutes' }, 429);
+    }
     const body = (await c.req.json().catch(() => ({}))) as {
       current?: string;
       next?: string;
@@ -180,18 +246,23 @@ export function createApp(db: DB) {
     };
     const stored = readAuthHash(db);
     if (stored && (typeof body.current !== 'string' || !verifyPassword(body.current, stored))) {
+      recordFailure(key);
       return c.json({ error: 'current password is incorrect' }, 400);
     }
+    attempts.delete(key);
     if (body.enabled === false) {
       writeAuthHash(db, null);
-      return c.json({ enabled: false, token: null });
+      clearSessions(db); // every device is signed out
+      deleteCookie(c, SESSION_COOKIE, { path: '/' });
+      return c.json({ enabled: false });
     }
     if (typeof body.next !== 'string' || body.next.length < 4 || body.next.length > 100) {
       return c.json({ error: 'password must be at least 4 characters' }, 400);
     }
-    const hash = hashPassword(body.next);
-    writeAuthHash(db, hash);
-    return c.json({ enabled: true, token: hash });
+    writeAuthHash(db, hashPassword(body.next));
+    clearSessions(db); // changing the password revokes all existing sessions…
+    startSession(c); // …except a fresh one for the device that changed it
+    return c.json({ enabled: true });
   });
 
   const categoryExists = (id: string) =>

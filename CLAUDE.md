@@ -2,8 +2,8 @@
 
 Self-hosted single-user personal finance PWA (React + Vite + TS client, Hono +
 better-sqlite3 server, one Docker container, SQLite in `./data/tower.db`).
-Deployed on the owner's Unraid server "The-Tower", LAN-only behind their own
-reverse proxy. EUR/nl-NL defaults; currency/locale configurable in Settings.
+Designed for trusted networks (LAN/VPN/own reverse proxy). EUR/nl-NL number
+formatting by default (configurable); dates always use English month names.
 
 ## Commands
 
@@ -39,10 +39,13 @@ ALWAYS run `npm test` and `npm run build` before committing.
   rows; the client loads everything once via `GET /api/bootstrap` into a
   single TanStack Query cache entry. All mutations in `src/client/api/data.ts`
   are optimistic against that entry with rollback + toast.
-- **Auth**: optional password, scrypt hash stored in DB settings row
-  `auth_hash` (never bootstrapped/exported; import preserves it). The session
-  token IS the stored hash, sent as `x-tower-key`. Managed entirely in
-  Settings → Security; no env vars.
+- **Auth**: optional password, scrypt hash in DB settings row `auth_hash`
+  (never bootstrapped/exported; import preserves it). Sessions are random
+  tokens in an **httpOnly cookie** (`tower_session`); only their SHA-256 lives
+  in the `sessions` table. Login/auth endpoints are rate limited; password
+  change/disable revokes all sessions; `/api/logout` = lock. Nothing
+  auth-related is stored in localStorage. The service worker never caches
+  `/api` responses.
 
 ## Conventions & gotchas
 
@@ -55,8 +58,12 @@ ALWAYS run `npm test` and `npm run build` before committing.
   helper text that must wrap.
 - Grids with nowrap content need `minmax(0, 1fr)` columns; `.main` needs
   `width: 100%` (grid item with auto margins).
-- Formatters (`src/shared/format.ts`) are module-level and configured from
-  settings via `configureFormat()` at load; tests rely on EUR/nl-NL defaults.
+- Formatters (`src/shared/format.ts`) are module-level; number/currency locale
+  comes from settings via `configureFormat()`, dates are always en-GB English.
+  Tests rely on EUR/nl-NL number defaults.
+- Navigation: mobile = top bar (brand, lock, settings gear) + tab bar
+  (Dashboard, Months, FAB, Plans, History) + Plans⇄Subscriptions switcher;
+  desktop = sidebar with all sections. The top bar owns the iOS safe-area.
 - No NaN ever: every division is guarded; money rounds via `round2`/EPS.
 - Keep files under ~500 lines; screens in `src/client/screens/`, reusable
   pieces in `src/client/components/`.

@@ -29,6 +29,20 @@
   min-width: 0;
 }
 
+/* segment hover/tap details: overlaid top-right, zero layout impact */
+.ribbon__hoverinfo {
+  position: absolute;
+  top: 24px;
+  right: 20px;
+  text-align: right;
+  pointer-events: none;
+  z-index: 1;
+}
+
+@media (min-width: 1024px) {
+  .ribbon__hoverinfo { top: 32px; right: 28px; }
+}
+
 .ribbon__income {
   font-size: clamp(28px, 9vw, 40px);
   font-weight: 700;
@@ -78,6 +92,36 @@
   .ribbon-card { padding: 32px 28px; }
   .ribbon__bar { height: 44px; }
   .ribbon__legend-amount { font-size: var(--text-lg); }
+}
+
+/* --- update banner ---------------------------------------------------------- */
+
+.update-banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  margin-bottom: 16px;
+  background: var(--saving-tint);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  font-size: var(--text-sm);
+}
+
+.update-banner__text {
+  flex: 1;
+  min-width: 0;
+}
+
+.update-banner__link {
+  color: var(--saving);
+  font-weight: 600;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.update-banner__link:hover {
+  text-decoration: underline;
 }
 
 /* --- stat cards ----------------------------------------------------------------- */

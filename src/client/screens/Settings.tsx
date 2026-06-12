@@ -4,7 +4,6 @@ import { salaryDate } from '../../shared/cycles';
 import { fmtDate, fmtEUR, currentMonthISO } from '../../shared/format';
 import type { BillingFrequency, Category, ExpenseTemplate } from '../../shared/types';
 import {
-  getAuthKey,
   importData,
   manageAuth,
   useAddCategory,
@@ -233,8 +232,8 @@ function SecurityForm({ enabled }: { enabled: boolean }) {
         {mismatch
           ? 'Passwords do not match.'
           : enabled
-            ? 'The app asks for this password on every device. Stored as a salted hash, never in backups.'
-            : 'Optional — when enabled, a login screen protects the app (min 4 characters).'}
+            ? 'Sessions use httpOnly cookies; changing or disabling the password signs out every device. Stored as a salted hash, never in backups. Use the lock icon (top bar / sidebar) to lock without disabling.'
+            : 'Optional — when enabled, a login screen protects the app and all API data (min 4 characters).'}
       </span>
     </form>
   );
@@ -619,8 +618,7 @@ function BackupControls() {
   };
 
   const onExport = async () => {
-    // fetch (not a plain link) so the auth header is sent when protection is on
-    const res = await fetch('/api/export', { headers: { 'x-tower-key': getAuthKey() } });
+    const res = await fetch('/api/export'); // session cookie is sent automatically
     if (!res.ok) {
       toast.show('Export failed', { error: true });
       return;

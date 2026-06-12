@@ -78,6 +78,11 @@ export function Dashboard() {
   }
 
   const { summary, periodText, series, netWorth, breakdown, plansAgg, top, budgetYtd } = derived;
+  const cyclic = (data?.settings.salaryDay ?? 1) !== 1;
+  // every aggregate states its bucketing so cycle vs calendar is never a guess
+  const cal = ' · calendar months';
+  const rangeLabel =
+    range === 'month' ? (cyclic ? 'this pay cycle' : 'this month') : range === 'ytd' ? (cyclic ? 'YTD pay cycles' : 'YTD') : 'all time';
 
   const stats: { label: string; value: number; cls?: string; format?: (n: number) => string }[] = [
     { label: 'Total income', value: summary.income, cls: 'amount--income' },
@@ -128,22 +133,22 @@ export function Dashboard() {
       )}
 
       <div className="chart-grid">
-        <Section title="Monthly cash flow">
+        <Section title={`Cash flow${cal}`}>
           <div className="chart-card__body">
             <CashFlowChart data={series} colors={colors} />
           </div>
         </Section>
-        <Section title="Income allocation">
+        <Section title={`Income allocation${cal}`}>
           <div className="chart-card__body">
             <AllocationChart data={series} colors={colors} />
           </div>
         </Section>
-        <Section title="Savings rate trend">
+        <Section title={`Savings rate${cal}`}>
           <div className="chart-card__body">
             <RateChart data={series} colors={colors} />
           </div>
         </Section>
-        <Section title="Net worth growth">
+        <Section title={`Net worth trend${cal}`}>
           <div className="chart-card__body">
             <NetWorthChart data={netWorth} colors={colors} />
           </div>
@@ -171,10 +176,10 @@ export function Dashboard() {
             ))}
           </div>
         </Section>
-        <Section title="Top spending categories">
+        <Section title={`Top spending · ${rangeLabel}`}>
           <CategoryBars items={top} />
         </Section>
-        <Section title="Budget vs actual · YTD">
+        <Section title={`Budget vs actual · ${cyclic ? "YTD pay cycles" : "YTD"}`}>
           <BudgetBars rows={budgetYtd} />
         </Section>
       </div>

@@ -10,12 +10,49 @@
   width: 100%;
   max-width: 1200px;
   margin: 0 auto;
-  /* safe-area: keep content clear of the notch / Dynamic Island / status bar
-     in standalone PWA mode, portrait and landscape */
-  padding: calc(20px + env(safe-area-inset-top, 0px))
-    max(16px, env(safe-area-inset-right, 0px))
+  /* the sticky .topbar absorbs the top safe-area on mobile */
+  padding: 12px max(16px, env(safe-area-inset-right, 0px))
     calc(var(--tabbar-h) + 32px + env(safe-area-inset-bottom, 0px))
     max(16px, env(safe-area-inset-left, 0px));
+}
+
+/* --- mobile top bar: brand + lock + settings, owns the top safe-area -------- */
+
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 48px;
+  padding: env(safe-area-inset-top, 0px) max(12px, env(safe-area-inset-right, 0px)) 0
+    max(16px, env(safe-area-inset-left, 0px));
+  background: color-mix(in srgb, var(--bg) 86%, transparent);
+  -webkit-backdrop-filter: blur(16px);
+  backdrop-filter: blur(16px);
+  border-bottom: 1px solid var(--border);
+}
+
+.topbar__brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: var(--text-sm);
+}
+
+.topbar__brand .sidebar__brand-mark {
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+}
+
+.topbar__actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
 }
 
 .screen-head {
@@ -101,7 +138,8 @@
     grid-template-columns: 220px 1fr;
   }
 
-  .tabbar {
+  .tabbar,
+  .topbar {
     display: none;
   }
 
@@ -159,9 +197,15 @@
 
   .sidebar__foot {
     margin-top: auto;
-    padding: 0 12px;
     color: var(--faint);
     font-size: var(--text-xs);
+  }
+}
+
+/* widescreen: let the content breathe a little more */
+@media (min-width: 1680px) {
+  .main {
+    max-width: 1400px;
   }
 }
 

@@ -125,8 +125,8 @@ describe('cycle-aware summaries', () => {
   });
 
   it('fmtCycle shows month names for day 1 and date ranges otherwise', () => {
-    expect(fmtCycle('2026-06', { salaryDay: 1, weekendRule: 'exact' })).toBe('juni 2026');
-    expect(fmtCycle('2026-06', { salaryDay: 26, weekendRule: 'exact' })).toBe('26 jun – 25 jul 2026');
+    expect(fmtCycle('2026-06', { salaryDay: 1, weekendRule: 'exact' })).toBe('June 2026');
+    expect(fmtCycle('2026-06', { salaryDay: 26, weekendRule: 'exact' })).toBe('26 Jun – 25 Jul 2026');
   });
 });
 
