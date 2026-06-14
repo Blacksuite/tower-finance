@@ -5,3 +5,4 @@ src/client/public/icons/
 *.log
 .DS_Store
 .env
+Claude/
