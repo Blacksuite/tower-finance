@@ -29,20 +29,6 @@
   min-width: 0;
 }
 
-/* segment hover/tap details: overlaid top-right, zero layout impact */
-.ribbon__hoverinfo {
-  position: absolute;
-  top: 24px;
-  right: 20px;
-  text-align: right;
-  pointer-events: none;
-  z-index: 1;
-}
-
-@media (min-width: 1024px) {
-  .ribbon__hoverinfo { top: 32px; right: 28px; }
-}
-
 .ribbon__income {
   font-size: clamp(28px, 9vw, 40px);
   font-weight: 700;
