@@ -1,4 +1,5 @@
 import { Hono, type Context } from 'hono';
+import { getConnInfo } from '@hono/node-server/conninfo';
 import { deleteCookie, getCookie, setCookie } from 'hono/cookie';
 import { createHash, randomBytes, randomUUID, scryptSync, timingSafeEqual } from 'node:crypto';
 import { z } from 'zod';
@@ -35,29 +36,51 @@ const SESSION_COOKIE = 'tower_session';
 const SESSION_DAYS = 180;
 const sha256 = (s: string) => createHash('sha256').update(s).digest('hex');
 
-// brute-force throttle for the auth endpoints (in-memory, per process)
+// brute-force throttle for the auth endpoints (in-memory, per app instance)
 const ATTEMPT_WINDOW_MS = 15 * 60 * 1000;
 const MAX_ATTEMPTS = 10;
-const attempts = new Map<string, { count: number; windowStart: number }>();
 
-function clientKey(c: { req: { header: (n: string) => string | undefined } }): string {
-  return c.req.header('x-forwarded-for')?.split(',')[0]?.trim() || 'local';
-}
-
-function rateLimited(key: string): boolean {
-  const a = attempts.get(key);
-  if (!a || Date.now() - a.windowStart > ATTEMPT_WINDOW_MS) return false;
-  return a.count >= MAX_ATTEMPTS;
-}
-
-function recordFailure(key: string) {
-  const now = Date.now();
-  const a = attempts.get(key);
-  if (!a || now - a.windowStart > ATTEMPT_WINDOW_MS) {
-    attempts.set(key, { count: 1, windowStart: now });
-  } else {
-    a.count++;
+/**
+ * x-forwarded-for is client-controlled, so trusting it unconditionally lets an
+ * attacker rotate the header to dodge the throttle. It is only honored behind
+ * a reverse proxy the operator vouches for (TRUST_PROXY=1); otherwise the key
+ * is the real socket address.
+ */
+function clientKey(c: Context): string {
+  if (process.env.TRUST_PROXY) {
+    const fwd = c.req.header('x-forwarded-for')?.split(',')[0]?.trim();
+    if (fwd) return fwd;
   }
+  try {
+    return getConnInfo(c).remote.address || 'local';
+  } catch {
+    return 'local'; // no socket (e.g. app.request() in tests)
+  }
+}
+
+function createThrottle() {
+  const attempts = new Map<string, { count: number; windowStart: number }>();
+  return {
+    limited(key: string): boolean {
+      const a = attempts.get(key);
+      if (!a || Date.now() - a.windowStart > ATTEMPT_WINDOW_MS) return false;
+      return a.count >= MAX_ATTEMPTS;
+    },
+    recordFailure(key: string) {
+      const now = Date.now();
+      // expired entries are dropped so the map cannot grow without bound
+      for (const [k, v] of attempts) if (now - v.windowStart > ATTEMPT_WINDOW_MS) attempts.delete(k);
+      const a = attempts.get(key);
+      if (!a || now - a.windowStart > ATTEMPT_WINDOW_MS) {
+        attempts.set(key, { count: 1, windowStart: now });
+      } else {
+        a.count++;
+      }
+    },
+    clear(key: string) {
+      attempts.delete(key);
+    },
+  };
 }
 
 // --- validation schemas ------------------------------------------------------
@@ -109,6 +132,7 @@ const settingsInput = z.object({
   savingsTarget: z.number().finite().min(0).max(1e9).optional(),
   investmentsTarget: z.number().finite().min(0).max(1e9).optional(),
   startingNetWorth: z.number().finite().min(-1e9).max(1e9).optional(),
+  safetyBuffer: z.number().finite().min(0).max(1e9).optional(),
   salaryDay: z.number().int().min(1).max(31).optional(),
   weekendRule: z.enum(['previous', 'exact', 'next']).optional(),
   currency: z.string().regex(/^[A-Za-z]{3}$/).optional(),
@@ -136,6 +160,22 @@ const templateInput = z.object({
   defaultDay: z.number().int().min(1).max(31).nullable().default(null),
 });
 
+const incomeBase = z.object({
+  name: z.string().trim().min(1).max(100),
+  amount,
+  frequency: z.enum(['monthly', 'weekly', 'biweekly', 'four_weekly', 'custom']),
+  anchorDate: isoDate,
+  intervalDays: z.number().int().min(1).max(366).nullable().default(null),
+  weekendRule: z.enum(['previous', 'exact', 'next']).default('exact'),
+  endsOn: isoDate.nullable().default(null),
+});
+
+const incomeInput = incomeBase
+  .refine((i) => i.frequency !== 'custom' || i.intervalDays !== null, {
+    message: 'custom frequency needs intervalDays',
+  })
+  .transform((i) => ({ ...i, intervalDays: i.frequency === 'custom' ? i.intervalDays : null }));
+
 const importInput = z.object({
   transactions: z.array(z.object({
     id: z.string().min(1),
@@ -156,7 +196,8 @@ const importInput = z.object({
     savingsTarget: z.number().finite(),
     investmentsTarget: z.number().finite(),
     startingNetWorth: z.number().finite(),
-    // optional for backups made before salary cycles existed
+    // optional for backups made before these fields existed
+    safetyBuffer: z.number().finite().min(0).default(100),
     salaryDay: z.number().int().min(1).max(31).default(1),
     weekendRule: z.enum(['previous', 'exact', 'next']).default('exact'),
     currency: z.string().regex(/^[A-Za-z]{3}$/).default('EUR'),
@@ -176,6 +217,8 @@ const importInput = z.object({
   })),
   subscriptions: z.array(subscriptionInput.extend({ id: z.string().min(1) })).default([]),
   templates: z.array(templateInput.extend({ id: z.string().min(1) })).default([]),
+  // optional for backups made before recurring income existed
+  incomes: z.array(incomeBase.extend({ id: z.string().min(1) })).default([]),
 });
 
 // --- app ----------------------------------------------------------------------
@@ -183,6 +226,27 @@ const importInput = z.object({
 export function createApp(db: DB) {
   const app = new Hono();
   const api = new Hono();
+  const throttle = createThrottle();
+
+  app.onError((err, c) => {
+    console.error(err);
+    return c.json({ error: 'internal error' }, 500);
+  });
+
+  // Cross-site HTML forms can only submit urlencoded/multipart/text-plain
+  // bodies. Requiring JSON on writes closes that CSRF/DNS-rebinding door even
+  // when password protection is disabled (cookies alone are SameSite=Lax).
+  api.use('*', async (c, next) => {
+    const method = c.req.method;
+    if (method === 'POST' || method === 'PUT') {
+      // forms always declare a content-type; bodyless requests (logout) don't
+      const ct = c.req.header('content-type');
+      if (ct !== undefined && !ct.toLowerCase().includes('application/json')) {
+        return c.json({ error: 'expected application/json' }, 415);
+      }
+    }
+    return next();
+  });
 
   // Optional password protection. Sessions are random 32-byte tokens delivered
   // as an httpOnly cookie; only their SHA-256 is stored server-side. No /api
@@ -210,18 +274,18 @@ export function createApp(db: DB) {
 
   api.post('/login', async (c) => {
     const key = clientKey(c);
-    if (rateLimited(key)) {
+    if (throttle.limited(key)) {
       return c.json({ error: 'too many attempts — try again in a few minutes' }, 429);
     }
     const body = (await c.req.json().catch(() => ({}))) as { password?: string };
     const stored = readAuthHash(db);
     if (!stored) return c.json({ ok: true }); // protection disabled: nothing to unlock
     if (typeof body.password === 'string' && verifyPassword(body.password, stored)) {
-      attempts.delete(key);
+      throttle.clear(key);
       startSession(c);
       return c.json({ ok: true });
     }
-    recordFailure(key);
+    throttle.recordFailure(key);
     return c.json({ error: 'wrong password' }, 401);
   });
 
@@ -236,7 +300,7 @@ export function createApp(db: DB) {
   // enable / change / disable the password (requires a valid session when enabled)
   api.post('/auth', async (c) => {
     const key = clientKey(c);
-    if (rateLimited(key)) {
+    if (throttle.limited(key)) {
       return c.json({ error: 'too many attempts — try again in a few minutes' }, 429);
     }
     const body = (await c.req.json().catch(() => ({}))) as {
@@ -246,10 +310,10 @@ export function createApp(db: DB) {
     };
     const stored = readAuthHash(db);
     if (stored && (typeof body.current !== 'string' || !verifyPassword(body.current, stored))) {
-      recordFailure(key);
+      throttle.recordFailure(key);
       return c.json({ error: 'current password is incorrect' }, 400);
     }
-    attempts.delete(key);
+    throttle.clear(key);
     if (body.enabled === false) {
       writeAuthHash(db, null);
       clearSessions(db); // every device is signed out
@@ -409,6 +473,34 @@ export function createApp(db: DB) {
 
   api.delete('/templates/:id', (c) => {
     const res = db.prepare('DELETE FROM templates WHERE id = ?').run(c.req.param('id'));
+    if (res.changes === 0) return c.json({ error: 'not found' }, 404);
+    return c.json({ ok: true });
+  });
+
+  // recurring incomes ---------------------------------------------------------------
+  api.post('/incomes', async (c) => {
+    const parsed = incomeInput.safeParse(await c.req.json().catch(() => null));
+    if (!parsed.success) return c.json({ error: parsed.error.issues[0].message }, 400);
+    const i = parsed.data;
+    const id = randomUUID();
+    db.prepare('INSERT INTO incomes (id, name, amount, frequency, anchor_date, interval_days, weekend_rule, ends_on) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
+      .run(id, i.name, i.amount, i.frequency, i.anchorDate, i.intervalDays, i.weekendRule, i.endsOn);
+    return c.json({ ...i, id }, 201);
+  });
+
+  api.put('/incomes/:id', async (c) => {
+    const id = c.req.param('id');
+    if (!db.prepare('SELECT 1 FROM incomes WHERE id = ?').get(id)) return c.json({ error: 'not found' }, 404);
+    const parsed = incomeInput.safeParse(await c.req.json().catch(() => null));
+    if (!parsed.success) return c.json({ error: parsed.error.issues[0].message }, 400);
+    const i = parsed.data;
+    db.prepare('UPDATE incomes SET name = ?, amount = ?, frequency = ?, anchor_date = ?, interval_days = ?, weekend_rule = ?, ends_on = ? WHERE id = ?')
+      .run(i.name, i.amount, i.frequency, i.anchorDate, i.intervalDays, i.weekendRule, i.endsOn, id);
+    return c.json({ ...i, id });
+  });
+
+  api.delete('/incomes/:id', (c) => {
+    const res = db.prepare('DELETE FROM incomes WHERE id = ?').run(c.req.param('id'));
     if (res.changes === 0) return c.json({ error: 'not found' }, 404);
     return c.json({ ok: true });
   });

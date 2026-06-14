@@ -16,7 +16,7 @@ import { Settings } from './screens/Settings';
 function PasswordGate({ children }: { children: React.ReactNode }) {
   const { data, error, refetch } = useAppData();
   const [pw, setPw] = useState('');
-  const [wrong, setWrong] = useState(false);
+  const [errMsg, setErrMsg] = useState<string | null>(null);
   if ((error as { status?: number } | null)?.status !== 401) {
     // apply the persisted currency/locale before anything renders amounts
     if (data) configureFormat(data.settings.currency, data.settings.locale);
@@ -33,9 +33,12 @@ function PasswordGate({ children }: { children: React.ReactNode }) {
     });
     if (res.ok) {
       setPw('');
+      setErrMsg(null);
       refetch();
     } else {
-      setWrong(true);
+      // a 429 (rate limited) must not be presented as "wrong password"
+      const body = (await res.json().catch(() => null)) as { error?: string } | null;
+      setErrMsg(body?.error || 'Wrong password');
     }
   };
 
@@ -51,10 +54,10 @@ function PasswordGate({ children }: { children: React.ReactNode }) {
             type="password"
             autoFocus
             value={pw}
-            onChange={(e) => { setPw(e.target.value); setWrong(false); }}
+            onChange={(e) => { setPw(e.target.value); setErrMsg(null); }}
           />
         </div>
-        {wrong && <span style={{ color: 'var(--expense)', fontSize: 'var(--text-sm)' }}>Wrong password</span>}
+        {errMsg && <span style={{ color: 'var(--expense)', fontSize: 'var(--text-sm)' }}>{errMsg}</span>}
         <button type="submit" className="btn btn--primary">Unlock</button>
       </form>
     </div>

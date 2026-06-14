@@ -27,17 +27,24 @@ export function addDays(date: string, n: number): string {
   return toISO(dt);
 }
 
+/** Shift a date off the weekend per the rule (payday behavior). */
+export function applyWeekendRule(date: string, rule: WeekendRule): string {
+  if (rule === 'exact') return date;
+  const [y, m, d] = date.split('-').map(Number);
+  const dt = new Date(y, m - 1, d);
+  const dow = dt.getDay();
+  if (dow !== 0 && dow !== 6) return date;
+  if (rule === 'previous') dt.setDate(dt.getDate() - (dow === 6 ? 1 : 2));
+  else dt.setDate(dt.getDate() + (dow === 6 ? 2 : 1));
+  return toISO(dt);
+}
+
 /** Actual payout date of the salary nominally due in `month` (YYYY-MM). */
 export function salaryDate(month: string, s: CycleSettings): string {
   const [y, m] = month.split('-').map(Number);
   const lastDay = new Date(y, m, 0).getDate();
   const d = new Date(y, m - 1, Math.min(Math.max(1, s.salaryDay), lastDay));
-  const dow = d.getDay();
-  if (s.weekendRule !== 'exact' && (dow === 0 || dow === 6)) {
-    if (s.weekendRule === 'previous') d.setDate(d.getDate() - (dow === 6 ? 1 : 2));
-    else d.setDate(d.getDate() + (dow === 6 ? 2 : 1));
-  }
-  return toISO(d);
+  return applyWeekendRule(toISO(d), s.weekendRule);
 }
 
 /**

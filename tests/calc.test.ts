@@ -39,6 +39,7 @@ const emptyData = (
   planPayments: [],
   subscriptions: [],
   templates: [],
+  incomes: [],
   auth: { enabled: false },
   ...over,
   settings: { ...DEFAULT_SETTINGS, ...(over.settings ?? {}) },

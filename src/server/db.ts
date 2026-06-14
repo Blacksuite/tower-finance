@@ -9,6 +9,7 @@ import {
   type ExpenseTemplate,
   type PaymentPlan,
   type PlanPayment,
+  type RecurringIncome,
   type Settings,
   type Subscription,
   type Transaction,
@@ -85,6 +86,16 @@ export function createDb(file: string) {
       frequency TEXT NOT NULL DEFAULT 'monthly' CHECK (frequency IN ('monthly','quarterly','yearly')),
       default_day INTEGER
     );
+    CREATE TABLE IF NOT EXISTS incomes (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      amount REAL NOT NULL CHECK (amount > 0),
+      frequency TEXT NOT NULL CHECK (frequency IN ('monthly','weekly','biweekly','four_weekly','custom')),
+      anchor_date TEXT NOT NULL,
+      interval_days INTEGER,
+      weekend_rule TEXT NOT NULL DEFAULT 'exact' CHECK (weekend_rule IN ('previous','exact','next')),
+      ends_on TEXT
+    );
   `);
 
   const catCount = (db.prepare('SELECT COUNT(*) n FROM categories').get() as { n: number }).n;
@@ -143,6 +154,18 @@ const toTemplate = (r: TemplateRow): ExpenseTemplate => ({
   description: r.description, frequency: r.frequency, defaultDay: r.default_day,
 });
 
+type IncomeRow = {
+  id: string; name: string; amount: number; frequency: RecurringIncome['frequency'];
+  anchor_date: string; interval_days: number | null;
+  weekend_rule: RecurringIncome['weekendRule']; ends_on: string | null;
+};
+
+const toIncome = (r: IncomeRow): RecurringIncome => ({
+  id: r.id, name: r.name, amount: r.amount, frequency: r.frequency,
+  anchorDate: r.anchor_date, intervalDays: r.interval_days,
+  weekendRule: r.weekend_rule, endsOn: r.ends_on,
+});
+
 export function readSettings(db: DB): Settings {
   const rows = db.prepare('SELECT key, value FROM settings').all() as { key: string; value: string }[];
   const s: Settings = { ...DEFAULT_SETTINGS };
@@ -174,7 +197,11 @@ export function insertSession(db: DB, tokenHash: string) {
 }
 
 export function sessionExists(db: DB, tokenHash: string): boolean {
-  const row = db.prepare('SELECT 1 FROM sessions WHERE token_hash = ?').get(tokenHash);
+  // expiry is enforced at lookup too — a session must not outlive its cookie
+  // just because nobody logged in again to trigger the pruning above
+  const row = db
+    .prepare("SELECT 1 FROM sessions WHERE token_hash = ? AND created_at >= datetime('now', '-180 day')")
+    .get(tokenHash);
   if (row) db.prepare("UPDATE sessions SET last_seen = datetime('now') WHERE token_hash = ?").run(tokenHash);
   return !!row;
 }
@@ -210,6 +237,7 @@ export function readAll(db: DB): AppData {
     planPayments: (db.prepare('SELECT * FROM plan_payments ORDER BY month').all() as PayRow[]).map(toPay),
     subscriptions: (db.prepare('SELECT * FROM subscriptions ORDER BY name').all() as SubRow[]).map(toSub),
     templates: (db.prepare('SELECT * FROM templates ORDER BY name').all() as TemplateRow[]).map(toTemplate),
+    incomes: (db.prepare('SELECT * FROM incomes ORDER BY name').all() as IncomeRow[]).map(toIncome),
     auth: { enabled: readAuthHash(db) !== null },
   };
 }
@@ -222,6 +250,7 @@ export function replaceAll(db: DB, data: Omit<AppData, 'auth'>) {
     db.prepare('DELETE FROM plans').run();
     db.prepare('DELETE FROM subscriptions').run();
     db.prepare('DELETE FROM templates').run();
+    db.prepare('DELETE FROM incomes').run();
     db.prepare('DELETE FROM transactions').run();
     db.prepare('DELETE FROM categories').run();
     db.prepare('DELETE FROM settings').run();
@@ -244,6 +273,9 @@ export function replaceAll(db: DB, data: Omit<AppData, 'auth'>) {
 
     const insTpl = db.prepare('INSERT INTO templates (id, name, amount, category_id, description, frequency, default_day) VALUES (?, ?, ?, ?, ?, ?, ?)');
     for (const t of data.templates) insTpl.run(t.id, t.name, t.amount, t.categoryId, t.description, t.frequency, t.defaultDay);
+
+    const insInc = db.prepare('INSERT INTO incomes (id, name, amount, frequency, anchor_date, interval_days, weekend_rule, ends_on) VALUES (?, ?, ?, ?, ?, ?, ?, ?)');
+    for (const i of data.incomes) insInc.run(i.id, i.name, i.amount, i.frequency, i.anchorDate, i.intervalDays, i.weekendRule, i.endsOn);
 
     writeSettings(db, data.settings);
   });

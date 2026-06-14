@@ -31,7 +31,7 @@ const data = (
   over: Partial<Omit<AppData, 'settings'>> & { settings?: Partial<Settings> } = {},
 ): AppData => ({
   transactions: [], categories: [], plans: [], planPayments: [],
-  subscriptions: [], templates: [], auth: { enabled: false },
+  subscriptions: [], templates: [], incomes: [], auth: { enabled: false },
   ...over,
   settings: { ...DEFAULT_SETTINGS, ...(over.settings ?? {}) },
 });

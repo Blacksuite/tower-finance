@@ -12,14 +12,17 @@ import {
   type DashboardRange,
 } from '../../shared/calc';
 import { CALENDAR, cycleBounds } from '../../shared/cycles';
-import { currentMonthISO, fmtDate, fmtEUR, fmtPct } from '../../shared/format';
+import { balanceAt, forecast } from '../../shared/forecast';
+import { currentMonthISO, fmtDate, fmtEUR, fmtEURWhole, fmtPct, todayISO } from '../../shared/format';
 import { useAppData, useCurrentCycle } from '../api/data';
 import { Progress } from '../components/ui/primitives';
 import { BudgetBars, CategoryBars } from '../components/BudgetBars';
 import { Ribbon } from '../components/Ribbon';
+import { UpcomingCard } from '../components/UpcomingCard';
 import {
   AllocationChart,
   CashFlowChart,
+  ForecastChart,
   NetWorthChart,
   RateChart,
   type MonthDatum,
@@ -56,6 +59,7 @@ export function Dashboard() {
       summary,
       periodText,
       series,
+      forecast: forecast(data, todayISO(), 90),
       netWorth: netWorthSeries(data, calNow, CALENDAR),
       breakdown: netWorthBreakdown(data, currentMonth),
       plansAgg: planAggregate(data, currentMonth),
@@ -77,7 +81,7 @@ export function Dashboard() {
     );
   }
 
-  const { summary, periodText, series, netWorth, breakdown, plansAgg, top, budgetYtd } = derived;
+  const { summary, periodText, series, forecast: fc, netWorth, breakdown, plansAgg, top, budgetYtd } = derived;
   const cyclic = (data?.settings.salaryDay ?? 1) !== 1;
   // every aggregate states its bucketing so cycle vs calendar is never a guess
   const cal = ' · calendar months';
@@ -104,6 +108,8 @@ export function Dashboard() {
           ariaLabel="Dashboard range"
         />
       </div>
+
+      {data && <UpcomingCard data={data} />}
 
       <Ribbon summary={summary} netWorth={breakdown.total} periodText={periodText} />
 
@@ -133,6 +139,20 @@ export function Dashboard() {
       )}
 
       <div className="chart-grid">
+        <Section
+          title="Forecast · next 90 days"
+          right={
+            <span className="hint" style={{ whiteSpace: 'nowrap' }}>
+              30d <strong className="amount">{fmtEURWhole(balanceAt(fc, 30))}</strong>
+              {' · '}60d <strong className="amount">{fmtEURWhole(balanceAt(fc, 60))}</strong>
+              {' · '}90d <strong className="amount">{fmtEURWhole(balanceAt(fc, 90))}</strong>
+            </span>
+          }
+        >
+          <div className="chart-card__body">
+            <ForecastChart data={fc.points} colors={colors} />
+          </div>
+        </Section>
         <Section title={`Cash flow${cal}`}>
           <div className="chart-card__body">
             <CashFlowChart data={series} colors={colors} />

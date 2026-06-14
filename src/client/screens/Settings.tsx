@@ -15,6 +15,7 @@ import {
   useUpdateSettings,
   useUpdateTemplate,
 } from '../api/data';
+import { IncomeManager } from '../components/IncomeManager';
 import { parseAmount } from '../components/QuickAdd';
 import { Icon } from '../components/ui/Icon';
 import { Sheet } from '../components/ui/Sheet';
@@ -55,6 +56,10 @@ export function Settings() {
 
       <Section title="Salary cycle">
         <SalaryCycleForm />
+      </Section>
+
+      <Section title="Recurring income">
+        <IncomeManager incomes={data.incomes} />
       </Section>
 
       <Section title="Monthly targets & net worth">
@@ -435,6 +440,12 @@ function TargetsForm() {
         allowNegative
         onCommit={(n) => update.mutate({ startingNetWorth: n })}
       />
+      <MoneyField
+        id="set-buffer"
+        label="Safety buffer"
+        value={s.safetyBuffer}
+        onCommit={(n) => update.mutate({ safetyBuffer: n })}
+      />
     </div>
   );
 }
@@ -550,9 +561,13 @@ function ReassignDialog({
   const others = categories.filter((c) => c.id !== category?.id);
   const [target, setTarget] = useState('');
 
-  const inUse = category
-    ? (data?.transactions.filter((t) => t.categoryId === category.id).length ?? 0)
-    : 0;
+  // the server blocks deletion while ANY of these reference the category
+  const inUse =
+    category && data
+      ? data.transactions.filter((t) => t.categoryId === category.id).length +
+        data.subscriptions.filter((s) => s.categoryId === category.id).length +
+        data.templates.filter((t) => t.categoryId === category.id).length
+      : 0;
 
   return (
     <Sheet open={category !== null} onClose={onClose} title={`Delete "${category?.name}"`}>
@@ -560,7 +575,8 @@ function ReassignDialog({
         {inUse > 0 ? (
           <>
             <p style={{ color: 'var(--muted)', fontSize: 'var(--text-sm)' }}>
-              {inUse} transaction{inUse === 1 ? '' : 's'} use this category. Pick a category to move them to.
+              {inUse} item{inUse === 1 ? '' : 's'} (transactions, subscriptions or templates) use
+              this category. Pick a category to move them to.
             </p>
             <select
               className="input"
@@ -576,7 +592,7 @@ function ReassignDialog({
           </>
         ) : (
           <p style={{ color: 'var(--muted)', fontSize: 'var(--text-sm)' }}>
-            This category has no transactions and can be deleted safely.
+            Nothing uses this category — it can be deleted safely.
           </p>
         )}
         <button

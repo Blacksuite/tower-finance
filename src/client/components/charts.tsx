@@ -3,13 +3,15 @@ import {
   BarChart,
   Line,
   LineChart,
+  ReferenceLine,
   ResponsiveContainer,
   Tooltip,
   XAxis,
   YAxis,
 } from 'recharts';
 import type { Summary } from '../../shared/calc';
-import { fmtEUR, fmtEURWhole, fmtMonthTick, fmtPct } from '../../shared/format';
+import type { ForecastPoint } from '../../shared/forecast';
+import { fmtDate, fmtEUR, fmtEURWhole, fmtMonthTick, fmtPct } from '../../shared/format';
 import type { useChartColors } from '../theme/theme';
 import { EmptyState } from './ui/primitives';
 
@@ -203,6 +205,44 @@ export function NetWorthChart({
           }}
         />
         <Line type="monotone" dataKey="value" stroke={colors.income} strokeWidth={2} dot={false} activeDot={{ r: 4 }} />
+      </LineChart>
+    </ResponsiveContainer>
+  );
+}
+
+/** Projected spendable balance, one point per day. */
+export function ForecastChart({ data, colors }: { data: ForecastPoint[]; colors: Colors }) {
+  if (data.length === 0) return <ChartEmpty />;
+  const step = Math.max(1, Math.ceil(data.length / 6));
+  const ticks = data.filter((_, i) => i % step === 0).map((d) => d.date);
+  const hasNegative = data.some((d) => d.balance < 0);
+  return (
+    <ResponsiveContainer width="100%" height="100%">
+      <LineChart data={data} margin={{ top: 8, right: 8, left: 4, bottom: 0 }}>
+        <XAxis dataKey="date" {...AXIS} stroke={colors.faint} tickFormatter={fmtDate} ticks={ticks} />
+        <YAxis {...AXIS} stroke={colors.faint} width={40} tickFormatter={eurTick} domain={['auto', 'auto']} />
+        {hasNegative && <ReferenceLine y={0} stroke={colors.expense} strokeDasharray="4 4" />}
+        <Tooltip
+          cursor={{ stroke: colors.border }}
+          content={(props: { active?: boolean; payload?: readonly { payload?: unknown }[] }) => {
+            if (!props.active || !props.payload?.length) return null;
+            const d = props.payload[0].payload as ForecastPoint | undefined;
+            if (!d) return null;
+            return (
+              <div className="chart-tooltip">
+                <span className="label">{fmtDate(d.date)}</span>
+                <div className="chart-tooltip__row">
+                  <span className="chart-tooltip__name">
+                    <span className="dot" style={{ background: colors.saving }} />
+                    Projected
+                  </span>
+                  <span className="amount">{fmtEURWhole(d.balance)}</span>
+                </div>
+              </div>
+            );
+          }}
+        />
+        <Line type="stepAfter" dataKey="balance" stroke={colors.saving} strokeWidth={2} dot={false} activeDot={{ r: 4 }} />
       </LineChart>
     </ResponsiveContainer>
   );

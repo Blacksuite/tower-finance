@@ -11,6 +11,7 @@ import type {
   Category,
   ExpenseTemplate,
   PaymentPlan,
+  RecurringIncome,
   Settings,
   Subscription,
   Transaction,
@@ -198,6 +199,29 @@ export function useDeleteTemplate() {
   return useOptimistic(
     (id: string) => api('DELETE', `/templates/${id}`),
     (data, id) => ({ ...data, templates: data.templates.filter((x) => x.id !== id) }),
+  );
+}
+
+export type IncomeInput = Omit<RecurringIncome, 'id'>;
+
+export function useAddIncome() {
+  return useOptimistic(
+    (i: IncomeInput) => api<RecurringIncome>('POST', '/incomes', i),
+    (data, i) => ({ ...data, incomes: [...data.incomes, { ...i, id: tempId() }] }),
+  );
+}
+
+export function useUpdateIncome() {
+  return useOptimistic(
+    (i: RecurringIncome) => api<RecurringIncome>('PUT', `/incomes/${i.id}`, stripId(i)),
+    (data, i) => ({ ...data, incomes: data.incomes.map((x) => (x.id === i.id ? i : x)) }),
+  );
+}
+
+export function useDeleteIncome() {
+  return useOptimistic(
+    (id: string) => api('DELETE', `/incomes/${id}`),
+    (data, id) => ({ ...data, incomes: data.incomes.filter((x) => x.id !== id) }),
   );
 }
 

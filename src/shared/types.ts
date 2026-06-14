@@ -21,6 +21,8 @@ export interface Settings {
   savingsTarget: number;
   investmentsTarget: number;
   startingNetWorth: number;
+  /** cushion the "okay until payday" verdict must stay above before it warns */
+  safetyBuffer: number;
   /** day of month the salary arrives; cycles run salary date → day before next */
   salaryDay: number;
   weekendRule: 'previous' | 'exact' | 'next';
@@ -32,6 +34,7 @@ export const DEFAULT_SETTINGS: Settings = {
   savingsTarget: 0,
   investmentsTarget: 0,
   startingNetWorth: 0,
+  safetyBuffer: 100,
   salaryDay: 1,
   weekendRule: 'exact',
   currency: 'EUR',
@@ -61,6 +64,21 @@ export interface ExpenseTemplate {
   defaultDay: number | null; // pre-fills the date field (clamped), else today
 }
 
+export type IncomeFrequency = 'monthly' | 'weekly' | 'biweekly' | 'four_weekly' | 'custom';
+
+export interface RecurringIncome {
+  id: string;
+  name: string;
+  amount: number;
+  frequency: IncomeFrequency;
+  /** first/reference payout; monthly repeats its day-of-month (clamped) */
+  anchorDate: string; // YYYY-MM-DD
+  /** custom frequency only: payout every N days from the anchor */
+  intervalDays: number | null;
+  weekendRule: 'previous' | 'exact' | 'next';
+  endsOn: string | null;
+}
+
 export interface PaymentPlan {
   id: string;
   name: string;
@@ -83,5 +101,6 @@ export interface AppData {
   planPayments: PlanPayment[];
   subscriptions: Subscription[];
   templates: ExpenseTemplate[];
+  incomes: RecurringIncome[];
   auth: { enabled: boolean };
 }
