@@ -67,7 +67,7 @@ export function UpdateBanner() {
       </span>
       <a
         className="update-banner__link"
-        href={`https://github.com/${REPO}/blob/main/docs/UPGRADING.md`}
+        href={`https://github.com/${REPO}#updating`}
         target="_blank"
         rel="noreferrer"
       >

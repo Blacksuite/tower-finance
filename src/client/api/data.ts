@@ -8,6 +8,7 @@ import { currentCycleKey } from '../../shared/calc';
 import { currentMonthISO, todayISO } from '../../shared/format';
 import type {
   AppData,
+  Bill,
   Category,
   ExpenseTemplate,
   PaymentPlan,
@@ -152,6 +153,7 @@ export function useDeleteCategory() {
       transactions: remap(data.transactions, v.id, v.reassignTo),
       subscriptions: remap(data.subscriptions, v.id, v.reassignTo),
       templates: remap(data.templates, v.id, v.reassignTo),
+      bills: remap(data.bills, v.id, v.reassignTo),
     }),
   );
 }
@@ -222,6 +224,60 @@ export function useDeleteIncome() {
   return useOptimistic(
     (id: string) => api('DELETE', `/incomes/${id}`),
     (data, id) => ({ ...data, incomes: data.incomes.filter((x) => x.id !== id) }),
+  );
+}
+
+export type BillInput = Omit<Bill, 'id'>;
+
+export function useAddBill() {
+  return useOptimistic(
+    (b: BillInput) => api<Bill>('POST', '/bills', b),
+    (data, b) => ({ ...data, bills: [...data.bills, { ...b, id: tempId() }] }),
+  );
+}
+
+export function useUpdateBill() {
+  return useOptimistic(
+    (b: Bill) => api<Bill>('PUT', `/bills/${b.id}`, stripId(b)),
+    (data, b) => ({ ...data, bills: data.bills.map((x) => (x.id === b.id ? b : x)) }),
+  );
+}
+
+export function useDeleteBill() {
+  return useOptimistic(
+    (id: string) => api('DELETE', `/bills/${id}`),
+    (data, id) => ({
+      ...data,
+      bills: data.bills.filter((x) => x.id !== id),
+      billPayments: data.billPayments.filter((p) => p.billId !== id),
+    }),
+  );
+}
+
+export function useSetBillPayment() {
+  return useOptimistic(
+    (v: { billId: string; date: string; amount: number }) =>
+      api('PUT', `/bills/${v.billId}/payments/${v.date}`, { amount: v.amount }),
+    (data, v) => ({
+      ...data,
+      billPayments: [
+        ...data.billPayments.filter((p) => !(p.billId === v.billId && p.date === v.date)),
+        v,
+      ],
+    }),
+  );
+}
+
+export function useClearBillPayment() {
+  return useOptimistic(
+    (v: { billId: string; date: string }) =>
+      api('DELETE', `/bills/${v.billId}/payments/${v.date}`),
+    (data, v) => ({
+      ...data,
+      billPayments: data.billPayments.filter(
+        (p) => !(p.billId === v.billId && p.date === v.date),
+      ),
+    }),
   );
 }
 

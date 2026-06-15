@@ -9,16 +9,15 @@ import {
   topCategories,
 } from '../../shared/calc';
 import { CALENDAR, cycleBounds, cycleKeyOf } from '../../shared/cycles';
-import { subOccurrencesForCycle } from '../../shared/recurring';
+import { virtualExpensesBetween } from '../../shared/ledger';
 import { TYPE_ORDER, TYPE_PLURALS } from '../../shared/constants';
-import { fmtCycle, fmtDate, fmtEUR, fmtMonth, fmtPct, todayISO } from '../../shared/format';
+import { fmtCycle, fmtEUR, fmtMonth, fmtPct, todayISO } from '../../shared/format';
 import { useAppData, useCurrentCycle } from '../api/data';
-import { Icon as UIIcon } from '../components/ui/Icon';
 import { useNavigate } from 'react-router-dom';
 import { BudgetBars, CategoryBars } from '../components/BudgetBars';
 import { OverrideInput } from '../components/PlanCard';
 import { useQuickAdd } from '../components/QuickAdd';
-import { TransactionList } from '../components/TransactionList';
+import { TransactionList, type LedgerItem } from '../components/TransactionList';
 import { Icon } from '../components/ui/Icon';
 import { CardSkeleton, EmptyState, Section, Segmented } from '../components/ui/primitives';
 
@@ -36,6 +35,10 @@ export function MonthView() {
   const reduced = useReducedMotion();
   const currentMonth = useCurrentCycle();
   const [month, setMonth] = useState(currentMonth);
+  // until the user navigates, track the live current cycle: bootstrap loads after
+  // mount, so the first render's currentMonth is the calendar-month fallback (the
+  // wrong cycle for salaryDay ≠ 1). Once data resolves, snap to the real cycle.
+  const navigated = useRef(false);
   const [dir, setDir] = useState(0);
   // budgeting view = salary cycles; calendar view = plain months for review
   const [view, setView] = useState<'cycle' | 'calendar'>('cycle');
@@ -44,11 +47,13 @@ export function MonthView() {
   const bucket = view === 'calendar' ? CALENDAR : data?.settings;
 
   const switchView = (v: 'cycle' | 'calendar') => {
+    navigated.current = true;
     setView(v);
     setMonth(cycleKeyOf(todayISO(), v === 'calendar' ? CALENDAR : data!.settings));
   };
 
   const go = (delta: number) => {
+    navigated.current = true;
     setDir(delta);
     setMonth((m) => addMonths(m, delta));
   };
@@ -64,14 +69,29 @@ export function MonthView() {
     return () => window.removeEventListener('keydown', onKey);
   }, []);
 
+  useEffect(() => {
+    if (!navigated.current) setMonth(currentMonth);
+  }, [currentMonth]);
+
   const derived = useMemo(() => {
     if (!data || !bucket) return null;
     const summary = monthlySummary(data, month, bucket);
+    const bounds = cycleBounds(month, bucket);
     const txs = data.transactions.filter((t) => keyOf(t.date, bucket) === month);
-    const byType = TYPE_ORDER.map((type) => ({
-      type,
-      items: txs.filter((t) => t.type === type),
-    }));
+    // subscriptions & bills as read-only rows in the expense column (plans keep
+    // their own interactive section below, so they're excluded here)
+    const virtualExpenses = virtualExpensesBetween(data, bounds.start, bounds.end, currentMonth)
+      .filter((v) => v.source.kind !== 'plan');
+    const byType = TYPE_ORDER.map((type) => {
+      const txItems = txs.filter((t) => t.type === type);
+      const items: LedgerItem[] =
+        type === 'expense'
+          ? [...txItems, ...virtualExpenses].sort((a, b) =>
+              a.date < b.date ? 1 : a.date > b.date ? -1 : a.id < b.id ? 1 : -1,
+            )
+          : txItems;
+      return { type, items };
+    });
     const plans = planStates(data, currentMonth)
       .map((st) => ({ st, row: st.rows.find((r) => r.month === month) }))
       .filter((x) => x.row);
@@ -79,8 +99,7 @@ export function MonthView() {
       summary,
       byType,
       plans,
-      subs: subOccurrencesForCycle(data.subscriptions, month, bucket),
-      bounds: cycleBounds(month, bucket),
+      bounds,
       budget: budgetVsActualMonth(data, month, bucket),
       top: topCategories(data, [month], bucket),
       categories: new Map(data.categories.map((c) => [c.id, c])),
@@ -96,7 +115,7 @@ export function MonthView() {
     );
   }
 
-  const { summary, byType, plans, subs, budget, top, categories } = derived;
+  const { summary, byType, plans, budget, top, categories } = derived;
   const cards = [
     { label: 'Income', value: summary.income, cls: 'amount--income' },
     { label: 'Expenses', value: summary.expenses, cls: 'amount--expense' },
@@ -172,33 +191,9 @@ export function MonthView() {
             <div className="stack">
               {byType.map(({ type, items }) => (
                 <Section key={type} title={TYPE_PLURALS[type]}>
-                  {items.length > 0 || (type === 'expense' && subs.length > 0) ? (
+                  {items.length > 0 ? (
                     <div className="tx-scroll">
                       <TransactionList transactions={items} categories={categories} />
-                      {type === 'expense' &&
-                        subs.map(({ sub, date }) => (
-                          <button
-                            key={`${sub.id}-${date}`}
-                            type="button"
-                            className="tx-row"
-                            onClick={() => navigate('/subscriptions')}
-                            aria-label={`Subscription ${sub.name}, − ${fmtEUR(sub.amount)}`}
-                          >
-                            <span className="tx-row__icon" style={{ background: 'var(--expense-tint)', color: 'var(--expense)' }}>
-                              <UIIcon name="repeat" size={17} />
-                            </span>
-                            <span className="tx-row__text">
-                              <span className="tx-row__primary">{sub.name}</span>
-                              <span className="tx-row__secondary" style={{ display: 'block' }}>
-                                Subscription{sub.categoryId ? ` · ${categories.get(sub.categoryId)?.name ?? ''}` : ''}
-                              </span>
-                            </span>
-                            <span style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 2 }}>
-                              <span className="amount tx-row__amount amount--expense">− {fmtEUR(sub.amount)}</span>
-                              <span className="tx-row__date">{fmtDate(date)}</span>
-                            </span>
-                          </button>
-                        ))}
                     </div>
                   ) : (
                     <EmptyState
@@ -232,11 +227,17 @@ export function MonthView() {
               )}
 
               <Section title="Budget vs actual">
-                <BudgetBars rows={budget} />
+                <BudgetBars
+                  rows={budget}
+                  onSelect={(id) => navigate(`/history?type=expense&categoryId=${encodeURIComponent(id)}`)}
+                />
               </Section>
 
               <Section title="Top spending">
-                <CategoryBars items={top} />
+                <CategoryBars
+                  items={top}
+                  onSelect={(id) => navigate(`/history?type=expense&categoryId=${encodeURIComponent(id)}`)}
+                />
               </Section>
             </div>
           </div>

@@ -8,15 +8,18 @@ import { useQuickAdd } from './QuickAdd';
 const NAV: { to: string; label: string; icon: IconName }[] = [
   { to: '/', label: 'Dashboard', icon: 'grid' },
   { to: '/months', label: 'Months', icon: 'calendar' },
+  { to: '/insights', label: 'Insights', icon: 'trend' },
   { to: '/plans', label: 'Plans', icon: 'layers' },
+  { to: '/bills', label: 'Bills', icon: 'wallet' },
   { to: '/subscriptions', label: 'Subscriptions', icon: 'repeat' },
   { to: '/history', label: 'History', icon: 'filter' },
   { to: '/settings', label: 'Settings', icon: 'gear' },
 ];
 
 // Mobile tab bar: four destinations + the FAB. Settings lives in the top bar
-// (gear), Subscriptions in the labeled Plans ⇄ Subscriptions switcher.
-const TABS = [NAV[0], NAV[1], NAV[2], NAV[4]];
+// (gear); Insights is reached from the dashboard; Bills & Subscriptions live in
+// the labeled Plans ⇄ Bills ⇄ Subscriptions switcher under the Plans tab.
+const TABS = [NAV[0], NAV[1], NAV[3], NAV[6]];
 
 function BrandMark() {
   return (

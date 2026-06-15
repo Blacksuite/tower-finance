@@ -1,5 +1,6 @@
 // "Am I okay until payday?" — pure derivations for the dashboard Upcoming
 // card. Everything is computed from raw rows; no value here is ever stored.
+import { billCountedAmount, billOccurrencesBetween } from './bills';
 import { planExpensesForMonth, round2 } from './calc';
 import { addDays, addMonths, cycleBounds, cycleKeyOf, salaryDate } from './cycles';
 import { daysBetween, nextPayday } from './income';
@@ -55,6 +56,11 @@ export function upcomingView(data: AppData, today: string): UpcomingView {
       bills.push({ name: sub.name, date, amount: sub.amount });
     }
   }
+  for (const bill of data.bills) {
+    for (const date of billOccurrencesBetween(bill, from, to)) {
+      bills.push({ name: bill.name, date, amount: billCountedAmount(bill, date, data.billPayments) });
+    }
+  }
   bills.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
   const billsTotal = round2(bills.reduce((sum, b) => sum + b.amount, 0));
 
@@ -69,6 +75,11 @@ export function upcomingView(data: AppData, today: string): UpcomingView {
   let pastVirtual = 0;
   for (const sub of data.subscriptions) {
     pastVirtual += occurrencesBetween(sub, start, today).length * sub.amount;
+  }
+  for (const bill of data.bills) {
+    for (const date of billOccurrencesBetween(bill, start, today)) {
+      pastVirtual += billCountedAmount(bill, date, data.billPayments);
+    }
   }
   const planDue = planExpensesForMonth(data, cycle);
 

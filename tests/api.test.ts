@@ -121,6 +121,42 @@ describe('plans & payments', () => {
   });
 });
 
+describe('bills & overrides', () => {
+  it('full bill lifecycle with per-occurrence overrides', async () => {
+    const cat = readAll(db).categories[0];
+    const created = await json('POST', '/api/bills', {
+      name: 'Utilities', amount: 80, categoryId: cat.id, frequency: 'monthly',
+      anchorDate: '2026-01-10', estimated: true,
+    });
+    expect(created.status).toBe(201);
+    const { id } = (await created.json()) as { id: string };
+
+    expect((await json('PUT', `/api/bills/${id}`, {
+      name: 'Utilities', amount: 90, frequency: 'monthly', anchorDate: '2026-01-10', estimated: true,
+    })).status).toBe(200);
+
+    // pin an actual amount for one occurrence, then upsert it
+    expect((await json('PUT', `/api/bills/${id}/payments/2026-06-10`, { amount: 105 })).status).toBe(200);
+    expect((await json('PUT', `/api/bills/${id}/payments/2026-06-10`, { amount: 110 })).status).toBe(200);
+    expect(readAll(db).billPayments).toEqual([{ billId: id, date: '2026-06-10', amount: 110 }]);
+
+    expect((await json('DELETE', `/api/bills/${id}/payments/2026-06-10`)).status).toBe(200);
+    expect(readAll(db).billPayments).toHaveLength(0);
+
+    // deleting the bill cascades its payments
+    await json('PUT', `/api/bills/${id}/payments/2026-07-10`, { amount: 70 });
+    expect((await json('DELETE', `/api/bills/${id}`)).status).toBe(200);
+    expect(readAll(db).billPayments).toHaveLength(0);
+  });
+
+  it('rejects invalid bills', async () => {
+    expect((await json('POST', '/api/bills', { name: '', amount: 50, frequency: 'monthly', anchorDate: '2026-01-01' })).status).toBe(400);
+    expect((await json('POST', '/api/bills', { name: 'X', amount: 50, frequency: 'custom', anchorDate: '2026-01-01' })).status).toBe(400); // custom needs intervalDays
+    expect((await json('POST', '/api/bills', { name: 'X', amount: 50, frequency: 'weekly', anchorDate: '2026-13-40' })).status).toBe(400);
+    expect((await json('POST', '/api/bills', { name: 'X', amount: 50, frequency: 'monthly', anchorDate: '2026-01-01', categoryId: 'ghost' })).status).toBe(400);
+  });
+});
+
 describe('settings, export & import', () => {
   it('persists settings partially', async () => {
     await json('PUT', '/api/settings', { savingsTarget: 500 });

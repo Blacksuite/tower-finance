@@ -1,33 +1,23 @@
 import { useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
-  budgetVsActualYtd,
-  monthAxis,
-  monthlySummary,
   netWorthBreakdown,
-  netWorthSeries,
   planAggregate,
   rangeMonths,
   summarize,
-  topCategories,
   type DashboardRange,
 } from '../../shared/calc';
-import { CALENDAR, cycleBounds } from '../../shared/cycles';
+import { billMonthlyCost } from '../../shared/bills';
+import { cycleBounds } from '../../shared/cycles';
+import { monthlyCost } from '../../shared/recurring';
 import { balanceAt, forecast } from '../../shared/forecast';
-import { currentMonthISO, fmtDate, fmtEUR, fmtEURWhole, fmtPct, todayISO } from '../../shared/format';
+import { fmtDate, fmtEUR, fmtEURWhole, todayISO } from '../../shared/format';
 import { useAppData, useCurrentCycle } from '../api/data';
-import { Progress } from '../components/ui/primitives';
-import { BudgetBars, CategoryBars } from '../components/BudgetBars';
 import { Ribbon } from '../components/Ribbon';
 import { UpcomingCard } from '../components/UpcomingCard';
-import {
-  AllocationChart,
-  CashFlowChart,
-  ForecastChart,
-  NetWorthChart,
-  RateChart,
-  type MonthDatum,
-} from '../components/charts';
-import { AnimatedAmount, CardSkeleton, Section, Segmented } from '../components/ui/primitives';
+import { ForecastChart } from '../components/charts';
+import { CardSkeleton, Section, Segmented } from '../components/ui/primitives';
+import { Icon } from '../components/ui/Icon';
 import { useChartColors, useTheme } from '../theme/theme';
 
 const rangeOptions = (cyclic: boolean): { value: DashboardRange; label: string }[] => [
@@ -40,6 +30,7 @@ export function Dashboard() {
   const { data, isLoading } = useAppData();
   const { resolved } = useTheme();
   const colors = useChartColors(resolved);
+  const navigate = useNavigate();
   const [range, setRange] = useState<DashboardRange>('month');
   const currentMonth = useCurrentCycle();
 
@@ -47,10 +38,9 @@ export function Dashboard() {
     if (!data) return null;
     const months = rangeMonths(data, range, currentMonth);
     const summary = summarize(data, months);
-    // trend charts report by true calendar months; ribbon/stats/budgets by cycle
-    const calNow = currentMonthISO();
-    const axis = monthAxis(data, calNow, CALENDAR).filter((m) => m <= calNow);
-    const series: MonthDatum[] = axis.map((m) => ({ month: m, ...monthlySummary(data, m, CALENDAR) }));
+    const today = todayISO();
+    const activeSubs = data.subscriptions.filter((s) => !s.endsOn || s.endsOn >= today);
+    const activeBills = data.bills.filter((b) => !b.endsOn || b.endsOn >= today);
     const periodText =
       months.length > 0
         ? `${fmtDate(cycleBounds(months[0], data.settings).start)} – ${fmtDate(cycleBounds(months[months.length - 1], data.settings).end)}`
@@ -58,13 +48,13 @@ export function Dashboard() {
     return {
       summary,
       periodText,
-      series,
-      forecast: forecast(data, todayISO(), 90),
-      netWorth: netWorthSeries(data, calNow, CALENDAR),
+      forecast: forecast(data, today, 90),
       breakdown: netWorthBreakdown(data, currentMonth),
       plansAgg: planAggregate(data, currentMonth),
-      top: topCategories(data, months),
-      budgetYtd: budgetVsActualYtd(data, currentMonth),
+      subsMonthly: activeSubs.reduce((a, s) => a + monthlyCost(s), 0),
+      subsCount: activeSubs.length,
+      billsMonthly: activeBills.reduce((a, b) => a + billMonthlyCost(b), 0),
+      billsCount: activeBills.length,
     };
   }, [data, range, currentMonth]);
 
@@ -72,30 +62,13 @@ export function Dashboard() {
     return (
       <div className="stack">
         <CardSkeleton lines={4} />
-        <div className="stat-grid">
-          {Array.from({ length: 6 }, (_, i) => (
-            <CardSkeleton key={i} lines={1} />
-          ))}
-        </div>
+        <CardSkeleton lines={2} />
       </div>
     );
   }
 
-  const { summary, periodText, series, forecast: fc, netWorth, breakdown, plansAgg, top, budgetYtd } = derived;
+  const { summary, periodText, forecast: fc, breakdown, plansAgg, subsMonthly, subsCount, billsMonthly, billsCount } = derived;
   const cyclic = (data?.settings.salaryDay ?? 1) !== 1;
-  // every aggregate states its bucketing so cycle vs calendar is never a guess
-  const cal = ' · calendar months';
-  const rangeLabel =
-    range === 'month' ? (cyclic ? 'this pay cycle' : 'this month') : range === 'ytd' ? (cyclic ? 'YTD pay cycles' : 'YTD') : 'all time';
-
-  const stats: { label: string; value: number; cls?: string; format?: (n: number) => string }[] = [
-    { label: 'Total income', value: summary.income, cls: 'amount--income' },
-    { label: 'Total expenses', value: summary.expenses, cls: 'amount--expense' },
-    { label: 'Total savings', value: summary.saved, cls: 'amount--saving' },
-    { label: 'Total investments', value: summary.invested, cls: 'amount--investment' },
-    { label: 'Net cash flow', value: summary.income - summary.expenses },
-    { label: 'Savings rate', value: summary.savingsRate, format: fmtPct },
-  ];
 
   return (
     <div className="stack">
@@ -104,7 +77,7 @@ export function Dashboard() {
         <Segmented
           value={range}
           onChange={setRange}
-          options={rangeOptions((data?.settings.salaryDay ?? 1) !== 1)}
+          options={rangeOptions(cyclic)}
           ariaLabel="Dashboard range"
         />
       </div>
@@ -114,95 +87,56 @@ export function Dashboard() {
       <Ribbon summary={summary} netWorth={breakdown.total} periodText={periodText} />
 
       <div className="stat-grid">
-        {stats.map((s) => (
-          <div key={s.label} className="card stat-card">
-            <span className="label">{s.label}</span>
-            <AnimatedAmount value={s.value} format={s.format} className={`amount ${s.cls ?? ''}`} />
-          </div>
-        ))}
+        <CommitmentCard
+          label={`Plans${plansAgg.active ? ` · ${plansAgg.active} active` : ''}`}
+          value={plansAgg.remaining > 0 ? `${fmtEUR(plansAgg.remaining)} left` : '—'}
+          onClick={() => navigate('/plans')}
+        />
+        <CommitmentCard
+          label={`Bills${billsCount ? ` · ${billsCount}` : ''}`}
+          value={billsMonthly > 0 ? `${fmtEUR(billsMonthly)}/mo` : '—'}
+          onClick={() => navigate('/bills')}
+        />
+        <CommitmentCard
+          label={`Subscriptions${subsCount ? ` · ${subsCount}` : ''}`}
+          value={subsMonthly > 0 ? `${fmtEUR(subsMonthly)}/mo` : '—'}
+          onClick={() => navigate('/subscriptions')}
+        />
       </div>
 
-      {plansAgg.total > 0 && (
-        <section className="card" aria-label="Payment plans overview">
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', flexWrap: 'wrap', gap: 8, marginBottom: 10 }}>
-            <h3 className="section-title" style={{ marginBottom: 0 }}>
-              Payment plans · {plansAgg.active} active
-            </h3>
-            <span className="amount" style={{ fontSize: 'var(--text-sm)' }}>
-              {fmtEUR(plansAgg.paid)}
-              <span style={{ color: 'var(--faint)', fontWeight: 400 }}> / {fmtEUR(plansAgg.total)}</span>
-              <span className="amount--debt"> · {fmtEUR(plansAgg.remaining)} left</span>
-            </span>
-          </div>
-          <Progress ratio={plansAgg.progress} color="var(--saving)" />
-        </section>
-      )}
+      <Section
+        title="Forecast · next 90 days"
+        right={
+          <span className="hint" style={{ whiteSpace: 'nowrap' }}>
+            30d <strong className="amount">{fmtEURWhole(balanceAt(fc, 30))}</strong>
+            {' · '}60d <strong className="amount">{fmtEURWhole(balanceAt(fc, 60))}</strong>
+            {' · '}90d <strong className="amount">{fmtEURWhole(balanceAt(fc, 90))}</strong>
+          </span>
+        }
+      >
+        <div className="chart-card__body">
+          <ForecastChart data={fc.points} colors={colors} />
+        </div>
+      </Section>
 
-      <div className="chart-grid">
-        <Section
-          title="Forecast · next 90 days"
-          right={
-            <span className="hint" style={{ whiteSpace: 'nowrap' }}>
-              30d <strong className="amount">{fmtEURWhole(balanceAt(fc, 30))}</strong>
-              {' · '}60d <strong className="amount">{fmtEURWhole(balanceAt(fc, 60))}</strong>
-              {' · '}90d <strong className="amount">{fmtEURWhole(balanceAt(fc, 90))}</strong>
-            </span>
-          }
-        >
-          <div className="chart-card__body">
-            <ForecastChart data={fc.points} colors={colors} />
-          </div>
-        </Section>
-        <Section title={`Cash flow${cal}`}>
-          <div className="chart-card__body">
-            <CashFlowChart data={series} colors={colors} />
-          </div>
-        </Section>
-        <Section title={`Income allocation${cal}`}>
-          <div className="chart-card__body">
-            <AllocationChart data={series} colors={colors} />
-          </div>
-        </Section>
-        <Section title={`Savings rate${cal}`}>
-          <div className="chart-card__body">
-            <RateChart data={series} colors={colors} />
-          </div>
-        </Section>
-        <Section title={`Net worth trend${cal}`}>
-          <div className="chart-card__body">
-            <NetWorthChart data={netWorth} colors={colors} />
-          </div>
-        </Section>
-        <Section
-          title="Net worth breakdown"
-          right={<span className="amount" style={{ fontSize: 'var(--text-md)' }}>{fmtEUR(breakdown.total)}</span>}
-        >
-          <div>
-            {[
-              { name: 'Cash', amount: breakdown.cash, color: 'var(--income)' },
-              ...breakdown.savings.map((s) => ({ name: s.account, amount: s.amount, color: 'var(--saving)' })),
-              ...breakdown.investments.map((s) => ({ name: s.account, amount: s.amount, color: 'var(--investment)' })),
-              ...breakdown.liabilities.map((l) => ({ name: `${l.name} (remaining)`, amount: -l.amount, color: 'var(--debt)' })),
-            ].map((row) => (
-              <div key={row.name + row.color} className="budget-row__top" style={{ padding: '8px 0' }}>
-                <span className="budget-row__name" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span className="dot" style={{ background: row.color }} />
-                  {row.name}
-                </span>
-                <span className={`amount budget-row__amount${row.amount < 0 ? ' amount--debt' : ''}`}>
-                  {fmtEUR(row.amount)}
-                </span>
-              </div>
-            ))}
-          </div>
-        </Section>
-        <Section title={`Top spending · ${rangeLabel}`}>
-          <CategoryBars items={top} />
-        </Section>
-        <Section title={`Budget vs actual · ${cyclic ? "YTD pay cycles" : "YTD"}`}>
-          <BudgetBars rows={budgetYtd} />
-        </Section>
-      </div>
+      <button type="button" className="card insights-link" onClick={() => navigate('/insights')}>
+        <span>
+          <span style={{ fontWeight: 600 }}>Trends &amp; insights</span>
+          <span className="hint" style={{ display: 'block' }}>
+            Cash flow, spending, budgets, net worth over time
+          </span>
+        </span>
+        <Icon name="trend" size={18} />
+      </button>
     </div>
+  );
+}
+
+function CommitmentCard({ label, value, onClick }: { label: string; value: string; onClick: () => void }) {
+  return (
+    <button type="button" className="card stat-card commit-card" onClick={onClick}>
+      <span className="label">{label}</span>
+      <span className="amount" style={{ fontSize: 'var(--text-md)' }}>{value}</span>
+    </button>
   );
 }

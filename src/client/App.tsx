@@ -8,7 +8,9 @@ import { Subscriptions } from './screens/Subscriptions';
 import { Layout } from './components/Layout';
 import { QuickAddProvider } from './components/QuickAdd';
 import { ToastProvider } from './components/ui/Toast';
+import { Bills } from './screens/Bills';
 import { Dashboard } from './screens/Dashboard';
+import { Insights } from './screens/Insights';
 import { MonthView } from './screens/MonthView';
 import { Plans } from './screens/Plans';
 import { Settings } from './screens/Settings';
@@ -96,7 +98,9 @@ export function App() {
               <Route element={<Layout />}>
                 <Route index element={<Dashboard />} />
                 <Route path="months" element={<MonthView />} />
+                <Route path="insights" element={<Insights />} />
                 <Route path="plans" element={<Plans />} />
+                <Route path="bills" element={<Bills />} />
                 <Route path="subscriptions" element={<Subscriptions />} />
                 <Route path="history" element={<History />} />
                 <Route path="settings" element={<Settings />} />

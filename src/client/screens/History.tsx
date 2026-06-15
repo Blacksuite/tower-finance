@@ -1,10 +1,12 @@
 import { useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { cycleBounds } from '../../shared/cycles';
 import { TYPE_PLURALS, TYPE_SIGNS } from '../../shared/constants';
 import { fmtDate, fmtEUR, todayISO } from '../../shared/format';
+import { virtualExpensesBetween } from '../../shared/ledger';
 import type { TransactionType } from '../../shared/types';
 import { useAppData, useCurrentCycle } from '../api/data';
-import { TransactionList } from '../components/TransactionList';
+import { TransactionList, type LedgerItem } from '../components/TransactionList';
 import { CardSkeleton, EmptyState, Section } from '../components/ui/primitives';
 
 type Period = 'cycle' | 'week' | 'month' | 'year' | 'all' | 'custom';
@@ -18,15 +20,23 @@ const PERIODS: { value: Period; label: string }[] = [
   { value: 'custom', label: 'Custom range' },
 ];
 
+const TX_TYPES: TransactionType[] = ['income', 'expense', 'saving', 'investment'];
+
 export function History() {
   const { data, isLoading } = useAppData();
   const currentCycle = useCurrentCycle();
   const today = todayISO();
-  const [period, setPeriod] = useState<Period>('cycle');
+  const [params] = useSearchParams();
+  // deep-link support: a filtered link (e.g. from Insights) seeds these on mount
+  const urlType = params.get('type');
+  const urlCategory = params.get('categoryId');
+  const [period, setPeriod] = useState<Period>(urlType || urlCategory ? 'all' : 'cycle');
   const [from, setFrom] = useState(today.slice(0, 8) + '01');
   const [to, setTo] = useState(today);
-  const [type, setType] = useState<'all' | TransactionType>('all');
-  const [categoryId, setCategoryId] = useState('all');
+  const [type, setType] = useState<'all' | TransactionType>(
+    urlType && (TX_TYPES as string[]).includes(urlType) ? (urlType as TransactionType) : 'all',
+  );
+  const [categoryId, setCategoryId] = useState(urlCategory ?? 'all');
 
   const derived = useMemo(() => {
     if (!data) return null;
@@ -47,13 +57,21 @@ export function History() {
     } else if (period === 'custom') {
       lo = from || lo; hi = to || hi;
     }
-    const items = data.transactions.filter(
-      (t) =>
-        t.date >= lo &&
-        t.date <= hi &&
-        (type === 'all' || t.type === type) &&
-        (categoryId === 'all' ||
-          (categoryId === '' ? t.categoryId === null && t.type === 'expense' : t.categoryId === categoryId)),
+    const matches = (t: LedgerItem) =>
+      t.date >= lo &&
+      t.date <= hi &&
+      (type === 'all' || t.type === type) &&
+      (categoryId === 'all' ||
+        (categoryId === '' ? t.categoryId === null && t.type === 'expense' : t.categoryId === categoryId));
+
+    const real = data.transactions.filter(matches);
+    // computed expenses (subscriptions/bills/plan installments) up to today, so
+    // History reconciles with the expense totals shown elsewhere
+    const vhi = hi < today ? hi : today;
+    const virtual = virtualExpensesBetween(data, lo, vhi, currentCycle).filter(matches);
+
+    const items: LedgerItem[] = [...real, ...virtual].sort((a, b) =>
+      a.date < b.date ? 1 : a.date > b.date ? -1 : a.id < b.id ? 1 : -1,
     );
     const net = items.reduce((a, t) => a + (t.type === 'income' ? t.amount : -t.amount), 0);
     return {
@@ -131,7 +149,8 @@ export function History() {
         )}
       </Section>
       <span className="hint" style={{ textAlign: 'center' }}>
-        Net total uses {TYPE_SIGNS.income === '+' ? '+' : ''}income − everything else. Tap a row to edit.
+        Net uses {TYPE_SIGNS.income === '+' ? '+' : ''}income − everything else. Tap a logged row to edit;
+        subscription, bill &amp; plan rows are computed — tap to manage them.
       </span>
     </div>
   );

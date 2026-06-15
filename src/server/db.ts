@@ -5,6 +5,8 @@ import { randomUUID } from 'node:crypto';
 import {
   DEFAULT_SETTINGS,
   type AppData,
+  type Bill,
+  type BillPayment,
   type Category,
   type ExpenseTemplate,
   type PaymentPlan,
@@ -96,6 +98,25 @@ export function createDb(file: string) {
       weekend_rule TEXT NOT NULL DEFAULT 'exact' CHECK (weekend_rule IN ('previous','exact','next')),
       ends_on TEXT
     );
+    CREATE TABLE IF NOT EXISTS bills (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      amount REAL NOT NULL CHECK (amount > 0),
+      category_id TEXT REFERENCES categories(id),
+      description TEXT NOT NULL DEFAULT '',
+      frequency TEXT NOT NULL CHECK (frequency IN ('once','weekly','biweekly','four_weekly','monthly','quarterly','yearly','custom')),
+      anchor_date TEXT NOT NULL,
+      interval_days INTEGER,
+      weekend_rule TEXT NOT NULL DEFAULT 'exact' CHECK (weekend_rule IN ('previous','exact','next')),
+      ends_on TEXT,
+      estimated INTEGER NOT NULL DEFAULT 0
+    );
+    CREATE TABLE IF NOT EXISTS bill_payments (
+      bill_id TEXT NOT NULL REFERENCES bills(id) ON DELETE CASCADE,
+      date TEXT NOT NULL,
+      amount REAL NOT NULL CHECK (amount >= 0),
+      PRIMARY KEY (bill_id, date)
+    );
   `);
 
   const catCount = (db.prepare('SELECT COUNT(*) n FROM categories').get() as { n: number }).n;
@@ -164,6 +185,24 @@ const toIncome = (r: IncomeRow): RecurringIncome => ({
   id: r.id, name: r.name, amount: r.amount, frequency: r.frequency,
   anchorDate: r.anchor_date, intervalDays: r.interval_days,
   weekendRule: r.weekend_rule, endsOn: r.ends_on,
+});
+
+type BillRow = {
+  id: string; name: string; amount: number; category_id: string | null;
+  description: string; frequency: Bill['frequency']; anchor_date: string;
+  interval_days: number | null; weekend_rule: Bill['weekendRule'];
+  ends_on: string | null; estimated: number;
+};
+type BillPaymentRow = { bill_id: string; date: string; amount: number };
+
+const toBill = (r: BillRow): Bill => ({
+  id: r.id, name: r.name, amount: r.amount, categoryId: r.category_id,
+  description: r.description, frequency: r.frequency, anchorDate: r.anchor_date,
+  intervalDays: r.interval_days, weekendRule: r.weekend_rule,
+  endsOn: r.ends_on, estimated: r.estimated !== 0,
+});
+const toBillPayment = (r: BillPaymentRow): BillPayment => ({
+  billId: r.bill_id, date: r.date, amount: r.amount,
 });
 
 export function readSettings(db: DB): Settings {
@@ -238,6 +277,8 @@ export function readAll(db: DB): AppData {
     subscriptions: (db.prepare('SELECT * FROM subscriptions ORDER BY name').all() as SubRow[]).map(toSub),
     templates: (db.prepare('SELECT * FROM templates ORDER BY name').all() as TemplateRow[]).map(toTemplate),
     incomes: (db.prepare('SELECT * FROM incomes ORDER BY name').all() as IncomeRow[]).map(toIncome),
+    bills: (db.prepare('SELECT * FROM bills ORDER BY name').all() as BillRow[]).map(toBill),
+    billPayments: (db.prepare('SELECT * FROM bill_payments ORDER BY date').all() as BillPaymentRow[]).map(toBillPayment),
     auth: { enabled: readAuthHash(db) !== null },
   };
 }
@@ -248,6 +289,8 @@ export function replaceAll(db: DB, data: Omit<AppData, 'auth'>) {
     const authHash = readAuthHash(db); // imports must never clobber the password
     db.prepare('DELETE FROM plan_payments').run();
     db.prepare('DELETE FROM plans').run();
+    db.prepare('DELETE FROM bill_payments').run();
+    db.prepare('DELETE FROM bills').run();
     db.prepare('DELETE FROM subscriptions').run();
     db.prepare('DELETE FROM templates').run();
     db.prepare('DELETE FROM incomes').run();
@@ -276,6 +319,12 @@ export function replaceAll(db: DB, data: Omit<AppData, 'auth'>) {
 
     const insInc = db.prepare('INSERT INTO incomes (id, name, amount, frequency, anchor_date, interval_days, weekend_rule, ends_on) VALUES (?, ?, ?, ?, ?, ?, ?, ?)');
     for (const i of data.incomes) insInc.run(i.id, i.name, i.amount, i.frequency, i.anchorDate, i.intervalDays, i.weekendRule, i.endsOn);
+
+    const insBill = db.prepare('INSERT INTO bills (id, name, amount, category_id, description, frequency, anchor_date, interval_days, weekend_rule, ends_on, estimated) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');
+    for (const b of data.bills) insBill.run(b.id, b.name, b.amount, b.categoryId, b.description, b.frequency, b.anchorDate, b.intervalDays, b.weekendRule, b.endsOn, b.estimated ? 1 : 0);
+
+    const insBillPay = db.prepare('INSERT INTO bill_payments (bill_id, date, amount) VALUES (?, ?, ?)');
+    for (const p of data.billPayments) insBillPay.run(p.billId, p.date, p.amount);
 
     writeSettings(db, data.settings);
   });

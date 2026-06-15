@@ -123,6 +123,44 @@
   font-size: var(--text-lg);
 }
 
+/* clickable commitment cards (Plans / Bills / Subscriptions) on the dashboard */
+.commit-card {
+  appearance: none;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color var(--dur) var(--ease);
+}
+
+.commit-card:hover { border-color: var(--border-strong); }
+
+.commit-card:focus-visible {
+  outline: 2px solid var(--border-strong);
+  outline-offset: 2px;
+}
+
+/* dashboard → insights drill-in */
+.insights-link {
+  appearance: none;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  transition: border-color var(--dur) var(--ease);
+}
+
+.insights-link:hover { border-color: var(--border-strong); }
+
+.insights-link:focus-visible {
+  outline: 2px solid var(--border-strong);
+  outline-offset: 2px;
+}
+
 /* --- chart cards ------------------------------------------------------------------ */
 
 .chart-card {
@@ -177,6 +215,10 @@
 }
 
 .tx-row:hover { background: var(--surface-2); }
+
+/* computed rows (subscriptions/bills/plan installments) read as lighter than logged ones */
+.tx-row--virtual { cursor: pointer; }
+.tx-row--virtual .tx-row__amount { font-weight: 500; opacity: 0.85; }
 
 .tx-row__icon {
   width: 38px;
@@ -295,6 +337,27 @@
   border-radius: 3px;
   transform-origin: left center;
   transition: width var(--dur-slow) var(--ease), background var(--dur) var(--ease);
+}
+
+/* summary rows that drill through to filtered History */
+.row-link {
+  appearance: none;
+  border: none;
+  background: transparent;
+  width: 100%;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  border-radius: var(--radius-input);
+  transition: background var(--dur) var(--ease);
+}
+
+.row-link:hover { background: var(--neutral-tint); }
+
+.row-link:focus-visible {
+  outline: 2px solid var(--border-strong);
+  outline-offset: 2px;
 }
 
 /* --- horizontal category bars --------------------------------------------------------------- */

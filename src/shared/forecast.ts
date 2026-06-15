@@ -6,6 +6,7 @@
 // cycle). Future events then never overlap with it: recurring income payouts
 // (+), subscription bills (−) and plan installments (−, due on the payday that
 // opens their cycle) from tomorrow onward.
+import { billCountedAmount, billOccurrencesBetween } from './bills';
 import { planStates, round2 } from './calc';
 import { addDays, cycleBounds, cycleKeyOf } from './cycles';
 import { paydaysBetween } from './income';
@@ -42,6 +43,11 @@ export function spendableBalance(data: AppData, today: string): number {
   for (const sub of data.subscriptions) {
     cash -= occurrencesBetween(sub, sub.firstBillDate, today).length * sub.amount;
   }
+  for (const bill of data.bills) {
+    for (const date of billOccurrencesBetween(bill, bill.anchorDate, today)) {
+      cash -= billCountedAmount(bill, date, data.billPayments);
+    }
+  }
   const cycle = cycleKeyOf(today, data.settings);
   for (const st of planStates(data, cycle)) cash -= st.paidToDate;
   return round2(cash);
@@ -59,6 +65,16 @@ export function forecastEvents(data: AppData, today: string, horizonDays: number
   for (const sub of data.subscriptions) {
     for (const date of occurrencesBetween(sub, from, to)) {
       events.push({ date, name: sub.name, amount: -sub.amount, kind: 'bill' });
+    }
+  }
+  for (const bill of data.bills) {
+    for (const date of billOccurrencesBetween(bill, from, to)) {
+      events.push({
+        date,
+        name: bill.name,
+        amount: -billCountedAmount(bill, date, data.billPayments),
+        kind: 'bill',
+      });
     }
   }
   const cycle = cycleKeyOf(today, data.settings);

@@ -1,18 +1,29 @@
 import { AnimatePresence, motion } from 'framer-motion';
 import { useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { TYPE_SIGNS } from '../../shared/constants';
 import { fmtDate, fmtSigned } from '../../shared/format';
+import type { VirtualExpense, VirtualKind } from '../../shared/ledger';
 import type { Category, Transaction } from '../../shared/types';
 import { useAddTransaction, useDeleteTransaction } from '../api/data';
 import { useQuickAdd } from './QuickAdd';
 import { Icon, categoryIcon, type IconName } from './ui/Icon';
 import { useToast } from './ui/Toast';
 
+export type LedgerItem = Transaction | VirtualExpense;
+const isVirtual = (t: LedgerItem): t is VirtualExpense => 'source' in t;
+
 const TYPE_ICONS: Record<Transaction['type'], IconName> = {
   income: 'wallet',
   expense: 'tag',
   saving: 'vault',
   investment: 'trend',
+};
+
+const VIRTUAL_META: Record<VirtualKind, { icon: IconName; label: string; path: string }> = {
+  subscription: { icon: 'repeat', label: 'Subscription', path: '/subscriptions' },
+  bill: { icon: 'wallet', label: 'Bill', path: '/bills' },
+  plan: { icon: 'layers', label: 'Plan', path: '/plans' },
 };
 
 function rowVisuals(tx: Transaction, categories: Map<string, Category>) {
@@ -31,6 +42,43 @@ function rowVisuals(tx: Transaction, categories: Map<string, Category>) {
     investment: { tint: 'var(--investment-tint)', ink: 'var(--investment)', secondary: tx.account ?? 'Investment' },
   }[tx.type];
   return { icon: TYPE_ICONS[tx.type], ...map };
+}
+
+/** Read-only row for a computed expense (subscription/bill/plan) — taps to its screen. */
+function VirtualRow({ tx, categories }: { tx: VirtualExpense; categories: Map<string, Category> }) {
+  const navigate = useNavigate();
+  const v = rowVisuals(tx, categories);
+  const meta = VIRTUAL_META[tx.source.kind];
+  return (
+    <motion.div
+      layout
+      initial={{ opacity: 0, y: 6 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, height: 0, marginTop: 0 }}
+      transition={{ duration: 0.18, ease: 'easeOut' }}
+    >
+      <button
+        type="button"
+        className="tx-row tx-row--virtual"
+        onClick={() => navigate(meta.path)}
+        aria-label={`${tx.description}, ${fmtSigned(tx.amount, '-')}, ${meta.label} — open ${meta.label.toLowerCase()}s`}
+      >
+        <span className="tx-row__icon" style={{ background: v.tint, color: v.ink }}>
+          <Icon name={meta.icon} size={17} />
+        </span>
+        <span className="tx-row__text">
+          <span className="tx-row__primary">{tx.description}</span>
+          <span className="tx-row__secondary" style={{ display: 'block' }}>
+            {v.secondary} · {meta.label}
+          </span>
+        </span>
+        <span style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 2 }}>
+          <span className="amount tx-row__amount amount--expense">{fmtSigned(tx.amount, '-')}</span>
+          <span className="tx-row__date">{fmtDate(tx.date)}</span>
+        </span>
+      </button>
+    </motion.div>
+  );
 }
 
 export function TransactionRow({
@@ -107,15 +155,19 @@ export function TransactionList({
   transactions,
   categories,
 }: {
-  transactions: Transaction[];
+  transactions: LedgerItem[];
   categories: Map<string, Category>;
 }) {
   return (
     <div className="tx-list">
       <AnimatePresence initial={false}>
-        {transactions.map((tx) => (
-          <TransactionRow key={tx.id} tx={tx} categories={categories} />
-        ))}
+        {transactions.map((tx) =>
+          isVirtual(tx) ? (
+            <VirtualRow key={tx.id} tx={tx} categories={categories} />
+          ) : (
+            <TransactionRow key={tx.id} tx={tx} categories={categories} />
+          ),
+        )}
       </AnimatePresence>
     </div>
   );

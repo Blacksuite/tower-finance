@@ -11,7 +11,7 @@ const data = (
   over: Partial<Omit<AppData, 'settings'>> & { settings?: Partial<Settings> } = {},
 ): AppData => ({
   transactions: [], categories: [], plans: [], planPayments: [],
-  subscriptions: [], templates: [], incomes: [], auth: { enabled: false },
+  subscriptions: [], templates: [], incomes: [], bills: [], billPayments: [], auth: { enabled: false },
   ...over,
   settings: { ...DEFAULT_SETTINGS, ...(over.settings ?? {}) },
 });
@@ -80,6 +80,40 @@ describe('upcomingView', () => {
     expect(v.leftUntilPayday).toBe(0);
     expect(v.billsTotal).toBe(0);
     expect(Number.isFinite(v.daysUntil)).toBe(true);
+  });
+
+  it('a one-off bill before payday shows up and lowers left-to-spend', () => {
+    const vet = {
+      id: 'b-vet', name: 'Vet', amount: 200, categoryId: null, description: '',
+      frequency: 'once' as const, anchorDate: '2026-06-20', intervalDays: null,
+      weekendRule: 'exact' as const, endsOn: null, estimated: false,
+    };
+    const d = data({
+      settings: { salaryDay: 26, weekendRule: 'previous' },
+      incomes: [salary],
+      transactions: [tx('2026-05-26', 'income', 3200), tx('2026-06-01', 'expense', 500)],
+      bills: [vet],
+    });
+    const v = upcomingView(d, '2026-06-13');
+    expect(v.bills).toContainEqual({ name: 'Vet', date: '2026-06-20', amount: 200 });
+    expect(v.leftUntilPayday).toBe(2500); // 3200 − 500 − 200
+  });
+
+  it('a variable bill already charged this cycle uses its per-occurrence override', () => {
+    const utils = {
+      id: 'b-utils', name: 'Utilities', amount: 80, categoryId: null, description: '',
+      frequency: 'monthly' as const, anchorDate: '2026-01-05', intervalDays: null,
+      weekendRule: 'exact' as const, endsOn: null, estimated: true,
+    };
+    const d = data({
+      settings: { salaryDay: 26, weekendRule: 'previous' },
+      incomes: [salary],
+      transactions: [tx('2026-05-26', 'income', 3200)],
+      bills: [utils], // charged 5 Jun, before today (13 Jun)
+      billPayments: [{ billId: 'b-utils', date: '2026-06-05', amount: 110 }],
+    });
+    const v = upcomingView(d, '2026-06-13');
+    expect(v.leftUntilPayday).toBe(3090); // 3200 − 110 (override, not the 80 estimate)
   });
 });
 

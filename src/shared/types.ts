@@ -79,6 +79,39 @@ export interface RecurringIncome {
   endsOn: string | null;
 }
 
+export type BillFrequency =
+  | 'once'
+  | 'weekly'
+  | 'biweekly'
+  | 'four_weekly'
+  | 'monthly'
+  | 'quarterly'
+  | 'yearly'
+  | 'custom';
+
+export interface Bill {
+  id: string;
+  name: string;
+  amount: number; // expected/estimated amount per occurrence
+  categoryId: string | null;
+  description: string;
+  frequency: BillFrequency;
+  /** first/reference due date; 'once' => the single due date */
+  anchorDate: string; // YYYY-MM-DD
+  /** custom frequency only: due every N days from the anchor */
+  intervalDays: number | null;
+  weekendRule: 'previous' | 'exact' | 'next';
+  endsOn: string | null;
+  /** true => amount is an estimate (utilities ~€80) the user may adjust per occurrence */
+  estimated: boolean;
+}
+
+export interface BillPayment {
+  billId: string;
+  date: string; // YYYY-MM-DD occurrence date
+  amount: number; // actual amount; overrides the estimate for that occurrence
+}
+
 export interface PaymentPlan {
   id: string;
   name: string;
@@ -102,5 +135,7 @@ export interface AppData {
   subscriptions: Subscription[];
   templates: ExpenseTemplate[];
   incomes: RecurringIncome[];
+  bills: Bill[];
+  billPayments: BillPayment[];
   auth: { enabled: boolean };
 }

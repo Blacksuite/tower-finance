@@ -116,6 +116,8 @@ describe('plan payments flow into monthly expenses', () => {
     subscriptions: [],
     templates: [],
     incomes: [],
+    bills: [],
+    billPayments: [],
     auth: { enabled: false },
     plans: [
       plan(),

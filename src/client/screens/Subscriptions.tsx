@@ -21,16 +21,18 @@ const FREQ_LABELS: Record<BillingFrequency, string> = {
   yearly: 'yearly',
 };
 
-/** Header switcher shared by the Plans and Subscriptions pages (mobile reach). */
-export function RecurringSwitcher({ current }: { current: 'plans' | 'subscriptions' }) {
+/** Header switcher shared by the Plans, Bills and Subscriptions pages (mobile reach). */
+const RECURRING_PATHS = { plans: '/plans', bills: '/bills', subscriptions: '/subscriptions' } as const;
+export function RecurringSwitcher({ current }: { current: 'plans' | 'bills' | 'subscriptions' }) {
   const navigate = useNavigate();
   return (
     <Segmented
       value={current}
-      onChange={(v) => navigate(v === 'plans' ? '/plans' : '/subscriptions')}
+      onChange={(v) => navigate(RECURRING_PATHS[v])}
       options={[
         { value: 'plans', label: 'Plans' },
-        { value: 'subscriptions', label: 'Subscriptions' },
+        { value: 'bills', label: 'Bills' },
+        { value: 'subscriptions', label: 'Subs' },
       ]}
       ariaLabel="Recurring section"
     />

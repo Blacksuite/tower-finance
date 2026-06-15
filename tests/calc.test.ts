@@ -11,7 +11,13 @@ import {
   summarize,
   topCategories,
 } from '../src/shared/calc';
-import { DEFAULT_SETTINGS, type AppData, type Settings, type Transaction } from '../src/shared/types';
+import { DEFAULT_SETTINGS, type AppData, type Bill, type Settings, type Transaction } from '../src/shared/types';
+
+const bill = (over: Partial<Bill> = {}): Bill => ({
+  id: 'b1', name: 'Rent', amount: 1200, categoryId: null, description: '',
+  frequency: 'monthly', anchorDate: '2026-01-01', intervalDays: null,
+  weekendRule: 'exact', endsOn: null, estimated: false, ...over,
+});
 
 let id = 0;
 const tx = (
@@ -40,6 +46,8 @@ const emptyData = (
   subscriptions: [],
   templates: [],
   incomes: [],
+  bills: [],
+  billPayments: [],
   auth: { enabled: false },
   ...over,
   settings: { ...DEFAULT_SETTINGS, ...(over.settings ?? {}) },
@@ -88,6 +96,33 @@ describe('monthlySummary', () => {
     const s = summarize(data, ['2026-05', '2026-06']);
     expect(s.income).toBe(12999);
     expect(s.savingsRate).toBeCloseTo(600 / 12999);
+  });
+});
+
+describe('bills as virtual expenses', () => {
+  it('count toward cycle expenses in the summary', () => {
+    const data = emptyData({
+      transactions: [tx('2026-06-01', 'income', 3000)],
+      bills: [
+        bill({ id: 'rent', amount: 1200, anchorDate: '2026-01-01' }), // 1 Jun
+        bill({ id: 'utils', amount: 80, anchorDate: '2026-01-10', estimated: true }), // 10 Jun
+      ],
+      billPayments: [{ billId: 'utils', date: '2026-06-10', amount: 100 }],
+    });
+    const s = monthlySummary(data, '2026-06');
+    expect(s.billExpenses).toBe(1300); // 1200 + 100 override
+    expect(s.expenses).toBe(1300);
+    expect(s.leftOver).toBe(1700);
+  });
+
+  it('land in the matching category for budget vs actual', () => {
+    const data = emptyData({
+      categories: [{ id: 'housing', name: 'Housing', budget: 1500, sortOrder: 1 }],
+      bills: [bill({ id: 'rent', categoryId: 'housing', amount: 1200, anchorDate: '2026-01-01' })],
+    });
+    const row = budgetVsActualMonth(data, '2026-06').find((r) => r.id === 'housing')!;
+    expect(row.actual).toBe(1200);
+    expect(row.diff).toBe(300);
   });
 });
 

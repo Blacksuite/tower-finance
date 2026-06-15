@@ -73,9 +73,8 @@ services:
 docker compose up -d
 ```
 
-Open `http://<server-ip>:3210`. Updating is `docker compose pull && docker
-compose up -d`; pin a version tag (e.g. `:1.1.0`) for explicit upgrades and
-trivial rollbacks. Watchtower and Unraid's built-in update check both work.
+Open `http://<server-ip>:3210` — that's it. See **[Updating](#updating)** when a
+new version ships.
 
 Or build from source:
 
@@ -88,14 +87,46 @@ Tower Finance is designed for a single user on a trusted network (home LAN,
 VPN, or behind your own reverse proxy). If you expose it to the internet, put
 it behind HTTPS and enable the password.
 
+## Updating
+
+Tower Finance is a Docker image, so updating is two commands:
+
+```bash
+docker compose pull        # fetch the latest image
+docker compose up -d       # recreate the container
+```
+
+Your data is untouched — it lives in the `./data` volume — and schema migrations
+run automatically on start. The running version is shown at the bottom of
+Settings. Watchtower and Unraid's built-in update check also work for hands-off
+updates.
+
+**Pin a version / roll back.** Pin a tag instead of `:latest` in
+`docker-compose.yml` (e.g. `image: ghcr.io/blacksuite/tower-finance:1.3.1`); to
+roll back, set the previous tag and run `docker compose up -d` again. Building
+from source instead? Update with `git pull && docker compose up -d --build`.
+
+**Back up before a big jump (wise, not required).** Everything is one SQLite
+file:
+
+```bash
+sqlite3 data/tower.db ".backup backups/tower-$(date +%F).db"
+```
+
+…or **Settings → Backup → Export JSON**. To restore: `docker compose down`, copy
+the backup over `data/tower.db`, delete the stale `tower.db-wal` / `-shm` files,
+then `docker compose up -d` — or **Import JSON** in the app.
+
+> Forgot the app password? Remove the hash row and restart:
+> `sqlite3 data/tower.db "DELETE FROM settings WHERE key='auth_hash'"`
+
 ## Your data
 
 One SQLite database at `./data/tower.db`, mounted into the container. Back it
 up by copying the file (`sqlite3 data/tower.db ".backup ..."` for a live copy)
 or via Settings → Backup → Export JSON. Upgrades never touch the data volume
-and schema migrations run automatically — see
-[docs/UPGRADING.md](docs/UPGRADING.md) for the full backup → update → rollback
-workflow.
+and schema migrations run automatically — see [Updating](#updating) for the
+backup → update → rollback workflow.
 
 ## Development
 
