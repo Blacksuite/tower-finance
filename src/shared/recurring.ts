@@ -1,33 +1,26 @@
 // Subscription billing occurrences. Like plan payments these are computed,
 // never materialized as transactions: each occurrence contributes a virtual
-// expense to the cycle containing its billing date.
+// expense to the cycle containing its billing date. Date math is shared via
+// cadence.ts; subscriptions map onto it with no weekend rule.
+import {
+  nextOccurrence,
+  occurrencesBetween as cadenceOccurrences,
+  type Cadence,
+} from './cadence';
 import { cycleBounds, type CycleSettings } from './cycles';
 import type { Subscription } from './types';
 
 const FREQ_MONTHS = { monthly: 1, quarterly: 3, yearly: 12 } as const;
 
-const pad = (n: number) => String(n).padStart(2, '0');
-
-/** n-th billing date: first_bill_date stepped by frequency, day clamped. */
-function occurrence(sub: Subscription, n: number): string {
-  const [y, m, day] = sub.firstBillDate.split('-').map(Number);
-  const total = y * 12 + (m - 1) + n * FREQ_MONTHS[sub.frequency];
-  const oy = Math.floor(total / 12);
-  const om = (total % 12) + 1;
-  const lastDay = new Date(oy, om, 0).getDate();
-  return `${oy}-${pad(om)}-${pad(Math.min(day, lastDay))}`;
-}
+const toCadence = (sub: Subscription): Cadence => ({
+  anchorDate: sub.firstBillDate,
+  frequency: sub.frequency,
+  endsOn: sub.endsOn,
+});
 
 /** Billing dates of `sub` that fall inside [from, to] (and before its end). */
 export function occurrencesBetween(sub: Subscription, from: string, to: string): string[] {
-  const out: string[] = [];
-  const cap = sub.endsOn && sub.endsOn < to ? sub.endsOn : to;
-  for (let n = 0; n < 1200; n++) {
-    const d = occurrence(sub, n);
-    if (d > cap) break;
-    if (d >= from) out.push(d);
-  }
-  return out;
+  return cadenceOccurrences(toCadence(sub), from, to);
 }
 
 export interface SubOccurrence {
@@ -72,10 +65,5 @@ export function monthlyCost(sub: Subscription): number {
 
 /** Next upcoming billing date on/after `today`, or null when ended. */
 export function nextBillDate(sub: Subscription, today: string): string | null {
-  for (let n = 0; n < 1200; n++) {
-    const d = occurrence(sub, n);
-    if (sub.endsOn && d > sub.endsOn) return null;
-    if (d >= today) return d;
-  }
-  return null;
+  return nextOccurrence(toCadence(sub), today);
 }

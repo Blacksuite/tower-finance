@@ -115,7 +115,6 @@ const PATHS: Record<string, JSX.Element> = {
   download: <path d="M12 3v11M7.5 10.5 12 15l4.5-4.5M4 18.5V21h16v-2.5" />,
   upload: <path d="M12 15V4M7.5 8.5 12 4l4.5 4.5M4 18.5V21h16v-2.5" />,
   pencil: <path d="M4 20h4L20.5 7.5a2.1 2.1 0 0 0-3-3L5 17v3zM13.5 6.5l3 3" />,
-  check: <path d="m5 12.5 5 5L19.5 7" />,
 };
 
 export type IconName = keyof typeof PATHS;

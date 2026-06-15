@@ -12,8 +12,8 @@ export interface CycleSettings {
 
 export const DEFAULT_CYCLE: CycleSettings = { salaryDay: 1, weekendRule: 'exact' };
 
-const pad = (n: number) => String(n).padStart(2, '0');
-const toISO = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+export const pad = (n: number) => String(n).padStart(2, '0');
+export const toISO = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 
 export function addMonths(month: string, n: number): string {
   const [y, m] = month.split('-').map(Number);

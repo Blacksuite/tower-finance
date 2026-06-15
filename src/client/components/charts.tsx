@@ -56,7 +56,36 @@ function makeTooltip(build: (d: MonthDatum) => TipRow[]) {
   };
 }
 
-function monthTicks(data: MonthDatum[]): string[] | undefined {
+// Single-series variant: same markup, one row, no series array.
+function singleTooltip<D>(opts: {
+  label: (d: D) => string;
+  capitalize?: boolean;
+  name: string;
+  color: string;
+  value: (d: D) => string;
+}) {
+  return function ChartTip(props: { active?: boolean; payload?: readonly { payload?: unknown }[] }) {
+    if (!props.active || !props.payload?.length) return null;
+    const d = props.payload[0].payload as D | undefined;
+    if (!d) return null;
+    return (
+      <div className="chart-tooltip">
+        <span className="label" style={opts.capitalize ? { textTransform: 'capitalize' } : undefined}>
+          {opts.label(d)}
+        </span>
+        <div className="chart-tooltip__row">
+          <span className="chart-tooltip__name">
+            <span className="dot" style={{ background: opts.color }} />
+            {opts.name}
+          </span>
+          <span className="amount">{opts.value(d)}</span>
+        </div>
+      </div>
+    );
+  };
+}
+
+function monthTicks(data: { month: string }[]): string[] | undefined {
   if (data.length <= 8) return undefined;
   const step = Math.ceil(data.length / 8);
   return data.filter((_, i) => i % step === 0).map((d) => d.month);
@@ -182,27 +211,17 @@ export function NetWorthChart({
   return (
     <ResponsiveContainer width="100%" height="100%">
       <LineChart data={data} margin={{ top: 8, right: 8, left: 4, bottom: 0 }}>
-        <XAxis dataKey="month" {...AXIS} stroke={colors.faint} tickFormatter={(m) => fmtMonthTick(m)} ticks={data.length > 8 ? data.filter((_, i) => i % Math.ceil(data.length / 8) === 0).map((d) => d.month) : undefined} />
+        <XAxis dataKey="month" {...AXIS} stroke={colors.faint} tickFormatter={(m) => fmtMonthTick(m)} ticks={monthTicks(data)} />
         <YAxis {...AXIS} stroke={colors.faint} width={40} tickFormatter={eurTick} domain={['auto', 'auto']} />
         <Tooltip
           cursor={{ stroke: colors.border }}
-          content={(props: { active?: boolean; payload?: readonly { payload?: unknown }[] }) => {
-            if (!props.active || !props.payload?.length) return null;
-            const d = props.payload[0].payload as { month: string; value: number } | undefined;
-            if (!d) return null;
-            return (
-              <div className="chart-tooltip">
-                <span className="label" style={{ textTransform: 'capitalize' }}>{fmtMonthTick(d.month, true)}</span>
-                <div className="chart-tooltip__row">
-                  <span className="chart-tooltip__name">
-                    <span className="dot" style={{ background: colors.income }} />
-                    Net worth
-                  </span>
-                  <span className="amount">{fmtEURWhole(d.value)}</span>
-                </div>
-              </div>
-            );
-          }}
+          content={singleTooltip<{ month: string; value: number }>({
+            label: (d) => fmtMonthTick(d.month, true),
+            capitalize: true,
+            name: 'Net worth',
+            color: colors.income,
+            value: (d) => fmtEURWhole(d.value),
+          })}
         />
         <Line type="monotone" dataKey="value" stroke={colors.income} strokeWidth={2} dot={false} activeDot={{ r: 4 }} />
       </LineChart>
@@ -224,23 +243,12 @@ export function ForecastChart({ data, colors }: { data: ForecastPoint[]; colors:
         {hasNegative && <ReferenceLine y={0} stroke={colors.expense} strokeDasharray="4 4" />}
         <Tooltip
           cursor={{ stroke: colors.border }}
-          content={(props: { active?: boolean; payload?: readonly { payload?: unknown }[] }) => {
-            if (!props.active || !props.payload?.length) return null;
-            const d = props.payload[0].payload as ForecastPoint | undefined;
-            if (!d) return null;
-            return (
-              <div className="chart-tooltip">
-                <span className="label">{fmtDate(d.date)}</span>
-                <div className="chart-tooltip__row">
-                  <span className="chart-tooltip__name">
-                    <span className="dot" style={{ background: colors.saving }} />
-                    Projected
-                  </span>
-                  <span className="amount">{fmtEURWhole(d.balance)}</span>
-                </div>
-              </div>
-            );
-          }}
+          content={singleTooltip<ForecastPoint>({
+            label: (d) => fmtDate(d.date),
+            name: 'Projected',
+            color: colors.saving,
+            value: (d) => fmtEURWhole(d.balance),
+          })}
         />
         <Line type="stepAfter" dataKey="balance" stroke={colors.saving} strokeWidth={2} dot={false} activeDot={{ r: 4 }} />
       </LineChart>
