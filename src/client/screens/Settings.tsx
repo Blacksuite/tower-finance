@@ -62,7 +62,7 @@ export function Settings() {
         <IncomeManager incomes={data.incomes} />
       </Section>
 
-      <Section title="Monthly targets & net worth">
+      <Section title="Monthly targets">
         <TargetsForm />
       </Section>
 
@@ -432,13 +432,6 @@ function TargetsForm() {
         label="Investments target / month"
         value={s.investmentsTarget}
         onCommit={(n) => update.mutate({ investmentsTarget: n })}
-      />
-      <MoneyField
-        id="set-networth"
-        label="Starting net worth"
-        value={s.startingNetWorth}
-        allowNegative
-        onCommit={(n) => update.mutate({ startingNetWorth: n })}
       />
       <MoneyField
         id="set-buffer"

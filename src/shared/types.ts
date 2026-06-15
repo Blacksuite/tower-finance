@@ -20,7 +20,6 @@ export interface Category {
 export interface Settings {
   savingsTarget: number;
   investmentsTarget: number;
-  startingNetWorth: number;
   /** cushion the "okay until payday" verdict must stay above before it warns */
   safetyBuffer: number;
   /** day of month the salary arrives; cycles run salary date → day before next */
@@ -33,7 +32,6 @@ export interface Settings {
 export const DEFAULT_SETTINGS: Settings = {
   savingsTarget: 0,
   investmentsTarget: 0,
-  startingNetWorth: 0,
   safetyBuffer: 100,
   salaryDay: 1,
   weekendRule: 'exact',

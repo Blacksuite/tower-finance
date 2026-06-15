@@ -131,7 +131,6 @@ const paymentInput = z.object({
 const settingsInput = z.object({
   savingsTarget: z.number().finite().min(0).max(1e9).optional(),
   investmentsTarget: z.number().finite().min(0).max(1e9).optional(),
-  startingNetWorth: z.number().finite().min(-1e9).max(1e9).optional(),
   safetyBuffer: z.number().finite().min(0).max(1e9).optional(),
   salaryDay: z.number().int().min(1).max(31).optional(),
   weekendRule: z.enum(['previous', 'exact', 'next']).optional(),
@@ -218,7 +217,6 @@ const importInput = z.object({
   settings: z.object({
     savingsTarget: z.number().finite(),
     investmentsTarget: z.number().finite(),
-    startingNetWorth: z.number().finite(),
     // optional for backups made before these fields existed
     safetyBuffer: z.number().finite().min(0).default(100),
     salaryDay: z.number().int().min(1).max(31).default(1),

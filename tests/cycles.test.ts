@@ -9,8 +9,6 @@ import {
 import { fmtCycle } from '../src/shared/format';
 import {
   monthlySummary,
-  netWorthBreakdown,
-  netWorthSeries,
   planAggregate,
   budgetVsActualMonth,
 } from '../src/shared/calc';
@@ -171,33 +169,9 @@ describe('subscriptions', () => {
   });
 });
 
-describe('net worth with liabilities', () => {
+describe('plan aggregate for the dashboard widget', () => {
   const d = data({
-    settings: { startingNetWorth: 10000 },
-    transactions: [
-      tx('2026-01-10', 'income', 3000),
-      tx('2026-01-12', 'expense', 1000),
-      tx('2026-01-20', 'saving', 500, { account: 'Bank A' }),
-      tx('2026-01-22', 'investment', 200, { account: 'ETF' }),
-    ],
     plans: [{ id: 'p1', name: 'Sofa', totalAmount: 900, installment: 300, startMonth: '2026-01' }],
-  });
-
-  it('subtracts outstanding plan balances from the trend', () => {
-    const series = netWorthSeries(d, '2026-02');
-    // jan: 10000 + 3000 − (1000 + 300 plan) = 11700 cash-basis; liability 600 → 11100
-    expect(series[0]).toEqual({ month: '2026-01', value: 11100 });
-    // feb: 11700 − 300 = 11400; liability 300 → 11100
-    expect(series[1]).toEqual({ month: '2026-02', value: 11100 });
-  });
-
-  it('breaks down assets per account and plans as liabilities', () => {
-    const b = netWorthBreakdown(d, '2026-02');
-    expect(b.savings).toEqual([{ account: 'Bank A', amount: 500 }]);
-    expect(b.investments).toEqual([{ account: 'ETF', amount: 200 }]);
-    expect(b.liabilities).toEqual([{ name: 'Sofa', amount: 300 }]);
-    expect(b.cash).toBe(10700); // 11400 gross − 500 − 200
-    expect(b.total).toBe(11100);
   });
 
   it('aggregates plans for the dashboard widget', () => {

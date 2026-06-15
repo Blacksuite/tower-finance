@@ -26,9 +26,9 @@ automates the rest.
   Friday / exact / next Monday). Periods run payday to payday and are labeled
   by their real date range ("26 Jun – 25 Jul"). Default is plain calendar
   months if that's your thing.
-- **Calendar-month reporting** — trend charts (cash flow, income allocation,
-  savings rate, net worth) report by true calendar months, and every chart says
-  which logic it uses. A toggle on the Months page switches between views.
+- **Calendar-month reporting** — the Insights trend charts (income allocation,
+  savings rate) report by true calendar months, and every chart says which logic
+  it uses. A toggle on the Months page switches between views.
 - **Fast manual entry** — quick-add sheet with a numeric keypad, category chips
   sorted by your usage, and reusable expense templates. Routine expense ≈ 3 taps.
 - **Subscriptions** — define them once (monthly/quarterly/yearly); they count
@@ -38,8 +38,9 @@ automates the rest.
   schedule reflows; the final installment self-adjusts.
 - **Budgets** — per-category budgets vs actuals as progress bars, monthly and
   YTD (scaled by the cycles you actually used), plus savings/investment targets.
-- **Net worth** — cash, savings and investments per account, outstanding plan
-  balances as liabilities, and a trend line.
+- **Bills** — recurring or one-off expenses (rent, utilities, anything) with a
+  flexible cadence and optional variable amounts; they flow into expenses,
+  budgets and the payday verdict automatically.
 - **History & filters** — every transaction filterable by cycle, week, month,
   year, custom range, category, and type.
 - **Optional password protection** — scrypt-hashed password, httpOnly cookie
@@ -140,8 +141,8 @@ npm run build        # production build (client + server + PWA icons)
 
 React + Vite + TypeScript, Hono + better-sqlite3, Recharts, framer-motion.
 All financial math lives in one pure, fully-tested module
-(`src/shared/calc.ts`): pay-cycle mapping, the plan cascade, budget math,
-net worth. Issues and PRs welcome.
+(`src/shared/calc.ts`): pay-cycle mapping, the plan cascade, budget math, and
+the payday verdict. Issues and PRs welcome.
 
 ## License
 

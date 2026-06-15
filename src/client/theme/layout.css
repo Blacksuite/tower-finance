@@ -78,7 +78,7 @@
   right: 0;
   z-index: 40;
   display: grid;
-  grid-template-columns: 1fr 1fr 72px 1fr 1fr;
+  grid-template-columns: 1fr 1fr 72px 1fr 1fr 1fr;
   align-items: stretch;
   height: calc(var(--tabbar-h) + env(safe-area-inset-bottom));
   padding-bottom: env(safe-area-inset-bottom);

@@ -3,15 +3,13 @@ import {
   BarChart,
   Line,
   LineChart,
-  ReferenceLine,
   ResponsiveContainer,
   Tooltip,
   XAxis,
   YAxis,
 } from 'recharts';
 import type { Summary } from '../../shared/calc';
-import type { ForecastPoint } from '../../shared/forecast';
-import { fmtDate, fmtEUR, fmtEURWhole, fmtMonthTick, fmtPct } from '../../shared/format';
+import { fmtMonthTick, fmtPct } from '../../shared/format';
 import type { useChartColors } from '../theme/theme';
 import { EmptyState } from './ui/primitives';
 
@@ -56,77 +54,10 @@ function makeTooltip(build: (d: MonthDatum) => TipRow[]) {
   };
 }
 
-// Single-series variant: same markup, one row, no series array.
-function singleTooltip<D>(opts: {
-  label: (d: D) => string;
-  capitalize?: boolean;
-  name: string;
-  color: string;
-  value: (d: D) => string;
-}) {
-  return function ChartTip(props: { active?: boolean; payload?: readonly { payload?: unknown }[] }) {
-    if (!props.active || !props.payload?.length) return null;
-    const d = props.payload[0].payload as D | undefined;
-    if (!d) return null;
-    return (
-      <div className="chart-tooltip">
-        <span className="label" style={opts.capitalize ? { textTransform: 'capitalize' } : undefined}>
-          {opts.label(d)}
-        </span>
-        <div className="chart-tooltip__row">
-          <span className="chart-tooltip__name">
-            <span className="dot" style={{ background: opts.color }} />
-            {opts.name}
-          </span>
-          <span className="amount">{opts.value(d)}</span>
-        </div>
-      </div>
-    );
-  };
-}
-
 function monthTicks(data: { month: string }[]): string[] | undefined {
   if (data.length <= 8) return undefined;
   const step = Math.ceil(data.length / 8);
   return data.filter((_, i) => i % step === 0).map((d) => d.month);
-}
-
-const eurTick = (v: number) =>
-  Math.abs(v) >= 1000 ? `${parseFloat((v / 1000).toFixed(1))}k` : String(Math.round(v));
-
-/** Grouped bars: income / expenses / saved / invested per month. */
-export function CashFlowChart({ data, colors }: { data: MonthDatum[]; colors: Colors }) {
-  if (data.length === 0) return <ChartEmpty />;
-  const series: [keyof Summary & string, string, string][] = [
-    ['income', 'Income', colors.income],
-    ['expenses', 'Expenses', colors.expense],
-    ['saved', 'Savings', colors.saving],
-    ['invested', 'Investments', colors.investment],
-  ];
-  return (
-    <ResponsiveContainer width="100%" height="100%">
-      <BarChart data={data} margin={{ top: 8, right: 4, left: 4, bottom: 0 }} barGap={1}>
-        <XAxis dataKey="month" {...AXIS} stroke={colors.faint} tickFormatter={(m) => fmtMonthTick(m)} ticks={monthTicks(data)} />
-        <YAxis {...AXIS} stroke={colors.faint} width={34} tickFormatter={eurTick} />
-        <Tooltip
-          cursor={{ fill: colors.neutral }}
-          content={makeTooltip((d) =>
-            series.map(([k, name, color]) => ({
-              name,
-              color,
-              value:
-                k === 'income' || d.income <= 0
-                  ? fmtEUR(d[k] as number)
-                  : `${fmtEUR(d[k] as number)} · ${fmtPct((d[k] as number) / d.income)}`,
-            })),
-          )}
-        />
-        {series.map(([key, , color]) => (
-          <Bar key={key} dataKey={key} fill={color} radius={[3, 3, 0, 0]} maxBarSize={18} isAnimationActive />
-        ))}
-      </BarChart>
-    </ResponsiveContainer>
-  );
 }
 
 /** 100% stacked bars: where each month's income went. */
@@ -194,63 +125,6 @@ export function RateChart({ data, colors }: { data: MonthDatum[]; colors: Colors
           content={makeTooltip((d) => [{ name: 'Savings rate', color: colors.saving, value: fmtPct(d.savingsRate) }])}
         />
         <Line type="monotone" dataKey="rate" stroke={colors.saving} strokeWidth={2} dot={false} activeDot={{ r: 4 }} />
-      </LineChart>
-    </ResponsiveContainer>
-  );
-}
-
-/** Net-worth growth line. */
-export function NetWorthChart({
-  data,
-  colors,
-}: {
-  data: { month: string; value: number }[];
-  colors: Colors;
-}) {
-  if (data.length === 0) return <ChartEmpty />;
-  return (
-    <ResponsiveContainer width="100%" height="100%">
-      <LineChart data={data} margin={{ top: 8, right: 8, left: 4, bottom: 0 }}>
-        <XAxis dataKey="month" {...AXIS} stroke={colors.faint} tickFormatter={(m) => fmtMonthTick(m)} ticks={monthTicks(data)} />
-        <YAxis {...AXIS} stroke={colors.faint} width={40} tickFormatter={eurTick} domain={['auto', 'auto']} />
-        <Tooltip
-          cursor={{ stroke: colors.border }}
-          content={singleTooltip<{ month: string; value: number }>({
-            label: (d) => fmtMonthTick(d.month, true),
-            capitalize: true,
-            name: 'Net worth',
-            color: colors.income,
-            value: (d) => fmtEURWhole(d.value),
-          })}
-        />
-        <Line type="monotone" dataKey="value" stroke={colors.income} strokeWidth={2} dot={false} activeDot={{ r: 4 }} />
-      </LineChart>
-    </ResponsiveContainer>
-  );
-}
-
-/** Projected spendable balance, one point per day. */
-export function ForecastChart({ data, colors }: { data: ForecastPoint[]; colors: Colors }) {
-  if (data.length === 0) return <ChartEmpty />;
-  const step = Math.max(1, Math.ceil(data.length / 6));
-  const ticks = data.filter((_, i) => i % step === 0).map((d) => d.date);
-  const hasNegative = data.some((d) => d.balance < 0);
-  return (
-    <ResponsiveContainer width="100%" height="100%">
-      <LineChart data={data} margin={{ top: 8, right: 8, left: 4, bottom: 0 }}>
-        <XAxis dataKey="date" {...AXIS} stroke={colors.faint} tickFormatter={fmtDate} ticks={ticks} />
-        <YAxis {...AXIS} stroke={colors.faint} width={40} tickFormatter={eurTick} domain={['auto', 'auto']} />
-        {hasNegative && <ReferenceLine y={0} stroke={colors.expense} strokeDasharray="4 4" />}
-        <Tooltip
-          cursor={{ stroke: colors.border }}
-          content={singleTooltip<ForecastPoint>({
-            label: (d) => fmtDate(d.date),
-            name: 'Projected',
-            color: colors.saving,
-            value: (d) => fmtEURWhole(d.balance),
-          })}
-        />
-        <Line type="stepAfter" dataKey="balance" stroke={colors.saving} strokeWidth={2} dot={false} activeDot={{ r: 4 }} />
       </LineChart>
     </ResponsiveContainer>
   );

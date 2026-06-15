@@ -65,9 +65,15 @@ export function History() {
         (categoryId === '' ? t.categoryId === null && t.type === 'expense' : t.categoryId === categoryId));
 
     const real = data.transactions.filter(matches);
-    // computed expenses (subscriptions/bills/plan installments) up to today, so
-    // History reconciles with the expense totals shown elsewhere
-    const vhi = hi < today ? hi : today;
+    // Computed expenses (subscriptions/bills/plan installments). Cap the window at
+    // the END of the current cycle, not at `today`: the dashboard and Months page
+    // count the whole current cycle's charges as committed, so History must show
+    // the same occurrences to reconcile. The cap also bounds open-ended ranges
+    // ('all'/'year') so we never generate occurrences for future cycles.
+    // ponytail: current-cycle end is the reconciliation horizon; revisit if a
+    // future-cycle ledger view is ever wanted.
+    const cycleEnd = cycleBounds(currentCycle, data.settings).end;
+    const vhi = hi < cycleEnd ? hi : cycleEnd;
     const virtual = virtualExpensesBetween(data, lo, vhi, currentCycle).filter(matches);
 
     const items: LedgerItem[] = [...real, ...virtual].sort((a, b) =>

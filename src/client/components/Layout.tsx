@@ -16,10 +16,10 @@ const NAV: { to: string; label: string; icon: IconName }[] = [
   { to: '/settings', label: 'Settings', icon: 'gear' },
 ];
 
-// Mobile tab bar: four destinations + the FAB. Settings lives in the top bar
-// (gear); Insights is reached from the dashboard; Bills & Subscriptions live in
-// the labeled Plans ⇄ Bills ⇄ Subscriptions switcher under the Plans tab.
-const TABS = [NAV[0], NAV[1], NAV[3], NAV[6]];
+// Mobile tab bar: five destinations + the FAB. Settings lives in the top bar
+// (gear); Bills & Subscriptions live in the labeled Plans ⇄ Bills ⇄
+// Subscriptions switcher under the Plans tab. Rendered 2 + FAB + 3.
+const TABS = [NAV[0], NAV[1], NAV[2], NAV[3], NAV[6]];
 
 function BrandMark() {
   return (

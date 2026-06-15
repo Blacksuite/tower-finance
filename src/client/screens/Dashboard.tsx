@@ -1,7 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  netWorthBreakdown,
   planAggregate,
   rangeMonths,
   summarize,
@@ -10,15 +9,11 @@ import {
 import { billMonthlyCost } from '../../shared/bills';
 import { cycleBounds } from '../../shared/cycles';
 import { monthlyCost } from '../../shared/recurring';
-import { balanceAt, forecast } from '../../shared/forecast';
-import { fmtDate, fmtEUR, fmtEURWhole, todayISO } from '../../shared/format';
+import { fmtDate, fmtEUR, todayISO } from '../../shared/format';
 import { useAppData, useCurrentCycle } from '../api/data';
 import { Ribbon } from '../components/Ribbon';
 import { UpcomingCard } from '../components/UpcomingCard';
-import { ForecastChart } from '../components/charts';
-import { CardSkeleton, Section, Segmented } from '../components/ui/primitives';
-import { Icon } from '../components/ui/Icon';
-import { useChartColors, useTheme } from '../theme/theme';
+import { CardSkeleton, Segmented } from '../components/ui/primitives';
 
 const rangeOptions = (cyclic: boolean): { value: DashboardRange; label: string }[] => [
   { value: 'month', label: cyclic ? 'This cycle' : 'This month' },
@@ -28,8 +23,6 @@ const rangeOptions = (cyclic: boolean): { value: DashboardRange; label: string }
 
 export function Dashboard() {
   const { data, isLoading } = useAppData();
-  const { resolved } = useTheme();
-  const colors = useChartColors(resolved);
   const navigate = useNavigate();
   const [range, setRange] = useState<DashboardRange>('month');
   const currentMonth = useCurrentCycle();
@@ -48,8 +41,6 @@ export function Dashboard() {
     return {
       summary,
       periodText,
-      forecast: forecast(data, today, 90),
-      breakdown: netWorthBreakdown(data, currentMonth),
       plansAgg: planAggregate(data, currentMonth),
       subsMonthly: activeSubs.reduce((a, s) => a + monthlyCost(s), 0),
       subsCount: activeSubs.length,
@@ -67,7 +58,7 @@ export function Dashboard() {
     );
   }
 
-  const { summary, periodText, forecast: fc, breakdown, plansAgg, subsMonthly, subsCount, billsMonthly, billsCount } = derived;
+  const { summary, periodText, plansAgg, subsMonthly, subsCount, billsMonthly, billsCount } = derived;
   const cyclic = (data?.settings.salaryDay ?? 1) !== 1;
 
   return (
@@ -84,7 +75,7 @@ export function Dashboard() {
 
       {data && <UpcomingCard data={data} />}
 
-      <Ribbon summary={summary} netWorth={breakdown.total} periodText={periodText} />
+      <Ribbon summary={summary} periodText={periodText} />
 
       <div className="stat-grid">
         <CommitmentCard
@@ -103,31 +94,6 @@ export function Dashboard() {
           onClick={() => navigate('/subscriptions')}
         />
       </div>
-
-      <Section
-        title="Forecast · next 90 days"
-        right={
-          <span className="hint" style={{ whiteSpace: 'nowrap' }}>
-            30d <strong className="amount">{fmtEURWhole(balanceAt(fc, 30))}</strong>
-            {' · '}60d <strong className="amount">{fmtEURWhole(balanceAt(fc, 60))}</strong>
-            {' · '}90d <strong className="amount">{fmtEURWhole(balanceAt(fc, 90))}</strong>
-          </span>
-        }
-      >
-        <div className="chart-card__body">
-          <ForecastChart data={fc.points} colors={colors} />
-        </div>
-      </Section>
-
-      <button type="button" className="card insights-link" onClick={() => navigate('/insights')}>
-        <span>
-          <span style={{ fontWeight: 600 }}>Trends &amp; insights</span>
-          <span className="hint" style={{ display: 'block' }}>
-            Cash flow, spending, budgets, net worth over time
-          </span>
-        </span>
-        <Icon name="trend" size={18} />
-      </button>
     </div>
   );
 }

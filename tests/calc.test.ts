@@ -6,7 +6,6 @@ import {
   budgetVsActualYtd,
   monthAxis,
   monthlySummary,
-  netWorthSeries,
   rangeMonths,
   summarize,
   topCategories,
@@ -132,7 +131,7 @@ describe('budget vs actual — sign conventions', () => {
       { id: 'c1', name: 'Groceries', budget: 400, sortOrder: 1 },
       { id: 'c2', name: 'Transport', budget: 150, sortOrder: 2 },
     ],
-    settings: { savingsTarget: 500, investmentsTarget: 250, startingNetWorth: 0 },
+    settings: { savingsTarget: 500, investmentsTarget: 250 },
     transactions: [
       tx('2026-06-02', 'expense', 450, { categoryId: 'c1' }), // overspent by 50
       tx('2026-06-03', 'expense', 100, { categoryId: 'c2' }), // 50 under
@@ -173,7 +172,7 @@ describe('budget vs actual — sign conventions', () => {
 describe('YTD budgets use active months', () => {
   const data = emptyData({
     categories: [{ id: 'c1', name: 'Groceries', budget: 400, sortOrder: 1 }],
-    settings: { savingsTarget: 500, investmentsTarget: 0, startingNetWorth: 0 },
+    settings: { savingsTarget: 500, investmentsTarget: 0 },
     transactions: [
       // active months: jan (income), feb (expense), jun (expense). mar–may inactive.
       tx('2026-01-15', 'income', 3000),
@@ -205,43 +204,6 @@ describe('YTD budgets use active months', () => {
     }), '2026-06');
     expect(rows[0].budget).toBe(0);
     expect(rows[0].pct).toBe(0);
-  });
-});
-
-describe('net worth series', () => {
-  it('starts from startingNetWorth and accumulates income - expenses', () => {
-    const data = emptyData({
-      settings: { savingsTarget: 0, investmentsTarget: 0, startingNetWorth: 10000 },
-      transactions: [
-        tx('2026-01-10', 'income', 3000),
-        tx('2026-01-12', 'expense', 1000),
-        tx('2026-02-10', 'income', 3000),
-        tx('2026-02-12', 'expense', 3500),
-      ],
-    });
-    const series = netWorthSeries(data, '2026-02');
-    expect(series).toEqual([
-      { month: '2026-01', value: 12000 },
-      { month: '2026-02', value: 11500 },
-    ]);
-  });
-
-  it('fills gap months so the line is continuous', () => {
-    const data = emptyData({
-      transactions: [tx('2026-01-10', 'income', 100), tx('2026-04-10', 'income', 100)],
-    });
-    expect(netWorthSeries(data, '2026-04').map((p) => p.month)).toEqual([
-      '2026-01', '2026-02', '2026-03', '2026-04',
-    ]);
-  });
-
-  it('includes plan payments as expenses', () => {
-    const data = emptyData({
-      settings: { savingsTarget: 0, investmentsTarget: 0, startingNetWorth: 1000 },
-      plans: [{ id: 'p1', name: 'TV', totalAmount: 300, installment: 100, startMonth: '2026-01' }],
-    });
-    const series = netWorthSeries(data, '2026-03');
-    expect(series[2]).toEqual({ month: '2026-03', value: 700 });
   });
 });
 

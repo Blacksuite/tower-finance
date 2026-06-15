@@ -4,23 +4,15 @@ import {
   budgetVsActualYtd,
   monthAxis,
   monthlySummary,
-  netWorthBreakdown,
-  netWorthSeries,
   rangeMonths,
   topCategories,
   type DashboardRange,
 } from '../../shared/calc';
 import { CALENDAR } from '../../shared/cycles';
-import { currentMonthISO, fmtEUR } from '../../shared/format';
+import { currentMonthISO } from '../../shared/format';
 import { useAppData, useCurrentCycle } from '../api/data';
 import { BudgetBars, CategoryBars } from '../components/BudgetBars';
-import {
-  AllocationChart,
-  CashFlowChart,
-  NetWorthChart,
-  RateChart,
-  type MonthDatum,
-} from '../components/charts';
+import { AllocationChart, RateChart, type MonthDatum } from '../components/charts';
 import { CardSkeleton, Section, Segmented } from '../components/ui/primitives';
 import { useChartColors, useTheme } from '../theme/theme';
 
@@ -46,8 +38,6 @@ export function Insights() {
     const series: MonthDatum[] = axis.map((m) => ({ month: m, ...monthlySummary(data, m, CALENDAR) }));
     return {
       series,
-      netWorth: netWorthSeries(data, calNow, CALENDAR),
-      breakdown: netWorthBreakdown(data, currentMonth),
       top: topCategories(data, months),
       budgetYtd: budgetVsActualYtd(data, currentMonth),
     };
@@ -66,7 +56,7 @@ export function Insights() {
     );
   }
 
-  const { series, netWorth, breakdown, top, budgetYtd } = derived;
+  const { series, top, budgetYtd } = derived;
   const cyclic = (data?.settings.salaryDay ?? 1) !== 1;
   const cal = ' · calendar months';
   const rangeLabel =
@@ -95,11 +85,6 @@ export function Insights() {
         <Section title={`Budget vs actual · ${cyclic ? 'YTD pay cycles' : 'YTD'}`}>
           <BudgetBars rows={budgetYtd} onSelect={seeCategory} />
         </Section>
-        <Section title={`Cash flow${cal}`}>
-          <div className="chart-card__body">
-            <CashFlowChart data={series} colors={colors} />
-          </div>
-        </Section>
         <Section title={`Income allocation${cal}`}>
           <div className="chart-card__body">
             <AllocationChart data={series} colors={colors} />
@@ -108,34 +93,6 @@ export function Insights() {
         <Section title={`Savings rate${cal}`}>
           <div className="chart-card__body">
             <RateChart data={series} colors={colors} />
-          </div>
-        </Section>
-        <Section title={`Net worth trend${cal}`}>
-          <div className="chart-card__body">
-            <NetWorthChart data={netWorth} colors={colors} />
-          </div>
-        </Section>
-        <Section
-          title="Net worth breakdown"
-          right={<span className="amount" style={{ fontSize: 'var(--text-md)' }}>{fmtEUR(breakdown.total)}</span>}
-        >
-          <div>
-            {[
-              { name: 'Cash', amount: breakdown.cash, color: 'var(--income)' },
-              ...breakdown.savings.map((s) => ({ name: s.account, amount: s.amount, color: 'var(--saving)' })),
-              ...breakdown.investments.map((s) => ({ name: s.account, amount: s.amount, color: 'var(--investment)' })),
-              ...breakdown.liabilities.map((l) => ({ name: `${l.name} (remaining)`, amount: -l.amount, color: 'var(--debt)' })),
-            ].map((row) => (
-              <div key={row.name + row.color} className="budget-row__top" style={{ padding: '8px 0' }}>
-                <span className="budget-row__name" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span className="dot" style={{ background: row.color }} />
-                  {row.name}
-                </span>
-                <span className={`amount budget-row__amount${row.amount < 0 ? ' amount--debt' : ''}`}>
-                  {fmtEUR(row.amount)}
-                </span>
-              </div>
-            ))}
           </div>
         </Section>
       </div>

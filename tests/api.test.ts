@@ -160,15 +160,15 @@ describe('bills & overrides', () => {
 describe('settings, export & import', () => {
   it('persists settings partially', async () => {
     await json('PUT', '/api/settings', { savingsTarget: 500 });
-    const res = await json('PUT', '/api/settings', { startingNetWorth: 12000, salaryDay: 25 });
-    expect(await res.json()).toEqual({ ...DEFAULT_SETTINGS, savingsTarget: 500, startingNetWorth: 12000, salaryDay: 25 });
+    const res = await json('PUT', '/api/settings', { safetyBuffer: 250, salaryDay: 25 });
+    expect(await res.json()).toEqual({ ...DEFAULT_SETTINGS, savingsTarget: 500, safetyBuffer: 250, salaryDay: 25 });
   });
 
   it('round-trips export → import', async () => {
     const cat = readAll(db).categories[0];
     await json('POST', '/api/transactions', { date: '2026-06-11', type: 'expense', amount: 42, categoryId: cat.id });
     await json('POST', '/api/plans', { name: 'TV', totalAmount: 500, installment: 100, startMonth: '2026-05' });
-    await json('PUT', '/api/settings', { startingNetWorth: 999 });
+    await json('PUT', '/api/settings', { safetyBuffer: 999 });
 
     const dump = (await (await json('GET', '/api/export')).json()) as AppData;
 

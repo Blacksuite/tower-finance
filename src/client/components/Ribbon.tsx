@@ -17,11 +17,9 @@ interface Seg {
  */
 export function Ribbon({
   summary,
-  netWorth,
   periodText,
 }: {
   summary: Summary;
-  netWorth?: number;
   periodText?: string;
 }) {
   const reduced = useReducedMotion();
@@ -48,16 +46,6 @@ export function Ribbon({
           </div>
           <AnimatedAmount value={income} className="amount ribbon__income" />
         </div>
-        {/* Net worth sits in its own in-flow slot and never changes on
-            interaction — no overlay, no swap, so it can neither overlap the
-            income figure nor reflow the bar (the per-segment amounts and % live
-            in the always-visible legend below, so no hover detail is needed). */}
-        {netWorth !== undefined && (
-          <div className="ribbon__aside">
-            <div className="label" style={{ marginBottom: 4 }}>Net worth</div>
-            <AnimatedAmount value={netWorth} className="amount" style={{ fontSize: 'var(--text-lg)' }} />
-          </div>
-        )}
       </div>
 
       {hasData ? (
