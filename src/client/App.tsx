@@ -6,6 +6,7 @@ import { configureFormat } from '../shared/format';
 import { History } from './screens/History';
 import { Subscriptions } from './screens/Subscriptions';
 import { Layout } from './components/Layout';
+import { Onboarding, isFreshInstall } from './components/Onboarding';
 import { QuickAddProvider } from './components/QuickAdd';
 import { ToastProvider } from './components/ui/Toast';
 import { Bills } from './screens/Bills';
@@ -72,6 +73,16 @@ function ScrollToTop() {
   return null;
 }
 
+/** First-run setup: only for a brand-new, empty install not yet dismissed here. */
+function OnboardingGate({ children }: { children: React.ReactNode }) {
+  const { data } = useAppData();
+  const [done, setDone] = useState(() => !!localStorage.getItem('tower-onboarded'));
+  if (data && !done && isFreshInstall(data)) {
+    return <Onboarding onDone={() => setDone(true)} />;
+  }
+  return <>{children}</>;
+}
+
 export function App() {
   const [queryClient] = useState(
     () =>
@@ -94,6 +105,7 @@ export function App() {
           <ScrollToTop />
           <QuickAddProvider>
             <PasswordGate>
+            <OnboardingGate>
             <Routes>
               <Route element={<Layout />}>
                 <Route index element={<Dashboard />} />
@@ -106,6 +118,7 @@ export function App() {
                 <Route path="settings" element={<Settings />} />
               </Route>
             </Routes>
+            </OnboardingGate>
             </PasswordGate>
           </QuickAddProvider>
         </BrowserRouter>

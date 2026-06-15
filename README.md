@@ -2,15 +2,27 @@
 
 **Self-hosted budgeting that follows your payday, not the calendar.**
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Build & publish](https://github.com/Blacksuite/tower-finance/actions/workflows/release.yml/badge.svg)](https://github.com/Blacksuite/tower-finance/actions/workflows/release.yml)
+[![Container](https://img.shields.io/badge/ghcr.io-blacksuite%2Ftower--finance-2496ED?logo=docker&logoColor=white)](https://github.com/Blacksuite/tower-finance/pkgs/container/tower-finance)
+
+Tower Finance answers one question, at a glance: **am I going to be okay until
+my next paycheck?** It opens with a single plain-language verdict — 🟢 okay,
+🟡 tight, or 🔴 trouble — and the detail sits quietly below.
+
 Most budget apps assume your month starts on the 1st. Real life starts when
 your salary lands — the 26th, the 25th, the last Friday before a weekend. Tower
 Finance budgets in **pay cycles** (payday → day before next payday) so your
-income and the bills it pays always live in the same period, while reports and
-trends stay available per calendar month.
+income and the bills it pays always live in the same period.
 
 It's a single small Docker container with one SQLite file. No cloud, no bank
 logins, no accounts, no telemetry. Your financial data never leaves your
-server.
+server. First launch walks you through a 30-second setup (your payday, your
+salary, a safety buffer) and drops you on a working dashboard.
+
+**Who it's for:** self-hosters who want full manual control over their money
+picture — people replacing a spreadsheet, not chasing automatic bank sync.
+Single user, single household, on a network you trust.
 
 ## Why this exists
 
@@ -143,8 +155,23 @@ npm run build        # production build (client + server + PWA icons)
 React + Vite + TypeScript, Hono + better-sqlite3, Recharts, framer-motion.
 All financial math lives in one pure, fully-tested module
 (`src/shared/calc.ts`): pay-cycle mapping, the plan cascade, budget math, and
-the payday verdict. Issues and PRs welcome.
+the payday verdict.
+
+## Contributing & feedback
+
+This is a young project and feedback shapes it. If you self-host it, I'd love to
+hear what works and what doesn't.
+
+- **Found a bug or have an idea?** Open an
+  [issue](https://github.com/Blacksuite/tower-finance/issues).
+- **Want to discuss or show your setup?** Start a
+  [discussion](https://github.com/Blacksuite/tower-finance/discussions).
+- **Pull requests welcome.** Keep financial logic in `src/shared/` with tests
+  (`npm test`), and run `npm run lint` before opening a PR.
+
+No telemetry means I can't see how it's used — so a one-line "it works on my
+Synology" is genuinely useful.
 
 ## License
 
-[MIT](LICENSE) — free and open source.
+[MIT](LICENSE) — free and open source. Self-host it, fork it, make it yours.
