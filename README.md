@@ -26,9 +26,10 @@ automates the rest.
   Friday / exact / next Monday). Periods run payday to payday and are labeled
   by their real date range ("26 Jun – 25 Jul"). Default is plain calendar
   months if that's your thing.
-- **Calendar-month reporting** — the Insights trend charts (income allocation,
-  savings rate) report by true calendar months, and every chart says which logic
-  it uses. A toggle on the Months page switches between views.
+- **Insights trends** — income allocation and savings rate, bucketed by your pay
+  cycle so a paycheck lines up with the spending it funds (calendar months would
+  strand them apart when payday isn't the 1st). The Months page keeps a
+  calendar/cycle toggle for month-by-month reporting.
 - **Fast manual entry** — quick-add sheet with a numeric keypad, category chips
   sorted by your usage, and reusable expense templates. Routine expense ≈ 3 taps.
 - **Subscriptions** — define them once (monthly/quarterly/yearly); they count

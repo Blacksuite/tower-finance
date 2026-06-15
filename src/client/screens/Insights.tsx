@@ -8,8 +8,6 @@ import {
   topCategories,
   type DashboardRange,
 } from '../../shared/calc';
-import { CALENDAR } from '../../shared/cycles';
-import { currentMonthISO } from '../../shared/format';
 import { useAppData, useCurrentCycle } from '../api/data';
 import { BudgetBars, CategoryBars } from '../components/BudgetBars';
 import { AllocationChart, RateChart, type MonthDatum } from '../components/charts';
@@ -33,9 +31,13 @@ export function Insights() {
   const derived = useMemo(() => {
     if (!data) return null;
     const months = rangeMonths(data, range, currentMonth);
-    const calNow = currentMonthISO();
-    const axis = monthAxis(data, calNow, CALENDAR).filter((m) => m <= calNow);
-    const series: MonthDatum[] = axis.map((m) => ({ month: m, ...monthlySummary(data, m, CALENDAR) }));
+    // Bucket the allocation + savings-rate trends by PAY CYCLE, not calendar
+    // month: a paycheck and the spending it funds straddle two calendar months
+    // when payday isn't the 1st, so calendar buckets misreport allocation (income
+    // in one month, its outflow in the next). Cycle bucketing matches the
+    // dashboard ribbon exactly. With salaryDay 1 the two are identical.
+    const axis = monthAxis(data, currentMonth).filter((m) => m <= currentMonth);
+    const series: MonthDatum[] = axis.map((m) => ({ month: m, ...monthlySummary(data, m) }));
     return {
       series,
       top: topCategories(data, months),
@@ -58,7 +60,7 @@ export function Insights() {
 
   const { series, top, budgetYtd } = derived;
   const cyclic = (data?.settings.salaryDay ?? 1) !== 1;
-  const cal = ' · calendar months';
+  const cal = cyclic ? ' · pay cycles' : ' · calendar months';
   const rangeLabel =
     range === 'month' ? (cyclic ? 'this pay cycle' : 'this month') : range === 'ytd' ? (cyclic ? 'YTD pay cycles' : 'YTD') : 'all time';
 
