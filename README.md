@@ -6,6 +6,8 @@
 
 **Self-hosted budgeting that follows your payday, not the calendar.**
 
+[Live overview & screenshots →](https://blacksuite.github.io/tower-finance/)
+
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Build & publish](https://github.com/Blacksuite/tower-finance/actions/workflows/release.yml/badge.svg)](https://github.com/Blacksuite/tower-finance/actions/workflows/release.yml)
 [![Container](https://img.shields.io/badge/ghcr.io-blacksuite%2Ftower--finance-2496ED?logo=docker&logoColor=white)](https://github.com/Blacksuite/tower-finance/pkgs/container/tower-finance)
