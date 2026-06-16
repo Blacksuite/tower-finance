@@ -1,5 +1,6 @@
-<h1>
-  <img src="docs/screenshots/logo.png" width="48" height="48" alt="Tower Finance logo" style="vertical-align: middle;" />
+<h1 align="center">
+  <img src="docs/screenshots/logo.png" width="64" height="64" alt="Tower Finance logo" />
+  <br />
   Tower Finance
 </h1>
 
