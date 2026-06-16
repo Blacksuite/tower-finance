@@ -4,7 +4,9 @@ import { salaryDate } from '../../shared/cycles';
 import { fmtDate, fmtEUR, currentMonthISO } from '../../shared/format';
 import type { BillingFrequency, Category, ExpenseTemplate } from '../../shared/types';
 import {
+  clearAllData,
   importData,
+  loadSampleData,
   manageAuth,
   useAddCategory,
   useAddTemplate,
@@ -84,6 +86,10 @@ export function Settings() {
 
       <Section title="Backup">
         <BackupControls />
+      </Section>
+
+      <Section title="Sample data">
+        <SampleDataControls />
       </Section>
 
       <span className="hint" style={{ textAlign: 'center' }}>
@@ -602,6 +608,58 @@ function ReassignDialog({
         </button>
       </div>
     </Sheet>
+  );
+}
+
+function SampleDataControls() {
+  const qc = useQueryClient();
+  const toast = useToast();
+  const [busy, setBusy] = useState(false);
+
+  const run = async (fn: () => Promise<void>, ok: string, confirmMsg: string) => {
+    if (!confirm(confirmMsg)) return;
+    setBusy(true);
+    try {
+      await fn();
+      toast.show(ok);
+    } catch (err) {
+      toast.show(err instanceof Error ? err.message : 'Something went wrong', { error: true });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="stack" style={{ gap: 'var(--space-3)' }}>
+      <span className="hint">
+        Load a realistic example budget to explore the app, then clear it whenever you like.
+        Both replace all current data.
+      </span>
+      <div className="cluster">
+        <button
+          className="btn btn--ghost"
+          type="button"
+          disabled={busy}
+          onClick={() =>
+            run(() => loadSampleData(qc), 'Sample data loaded', 'Load sample data? This replaces ALL current data.')
+          }
+        >
+          <Icon name="layers" size={15} />
+          Load sample data
+        </button>
+        <button
+          className="btn btn--danger"
+          type="button"
+          disabled={busy}
+          onClick={() =>
+            run(() => clearAllData(qc), 'Data cleared', 'Clear ALL data and start fresh? This cannot be undone.')
+          }
+        >
+          <Icon name="trash" size={15} />
+          Clear all data
+        </button>
+      </div>
+    </div>
   );
 }
 

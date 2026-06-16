@@ -6,6 +6,7 @@ import {
 } from '@tanstack/react-query';
 import { currentCycleKey } from '../../shared/calc';
 import { currentMonthISO, todayISO } from '../../shared/format';
+import { buildEmptyData, buildSampleData, SAMPLE_MARKER } from '../../shared/sampleData';
 import type {
   AppData,
   Bill,
@@ -355,6 +356,26 @@ export function useUpdateSettings() {
 export async function importData(qc: QueryClient, payload: unknown) {
   await api('POST', '/import', payload);
   await qc.invalidateQueries({ queryKey: KEY });
+}
+
+/** Load the "Explore" sample dataset and flag it so the sample-data banner shows. */
+export async function loadSampleData(qc: QueryClient) {
+  await importData(qc, buildSampleData());
+  try {
+    localStorage.setItem(SAMPLE_MARKER, '1');
+  } catch {
+    /* storage unavailable */
+  }
+}
+
+/** Wipe everything back to a fresh install and clear the sample-data flag. */
+export async function clearAllData(qc: QueryClient) {
+  await importData(qc, buildEmptyData());
+  try {
+    localStorage.removeItem(SAMPLE_MARKER);
+  } catch {
+    /* storage unavailable */
+  }
 }
 
 function stripId<T extends { id: string }>(obj: T): Omit<T, 'id'> {

@@ -18,11 +18,28 @@ income and the bills it pays always live in the same period.
 It's a single small Docker container with one SQLite file. No cloud, no bank
 logins, no accounts, no telemetry. Your financial data never leaves your
 server. First launch walks you through a 30-second setup (your payday, your
-salary, a safety buffer) and drops you on a working dashboard.
+salary, a safety buffer) and drops you on a working dashboard — or load the
+sample data with one tap to look around first.
 
 **Who it's for:** self-hosters who want full manual control over their money
 picture — people replacing a spreadsheet, not chasing automatic bank sync.
 Single user, single household, on a network you trust.
+
+## Screenshots
+
+The dashboard leads with the verdict; Insights and the pay-cycle views sit
+quietly behind it. (Shown with the built-in sample data — load it any time from
+the first-run screen or **Settings → Sample data**.)
+
+![Dashboard — the payday verdict, cash-flow ribbon and commitments](docs/screenshots/dashboard.png)
+
+![Insights — top spending, budget vs actual, income allocation and savings rate by pay cycle](docs/screenshots/insights.png)
+
+<p>
+  <img src="docs/screenshots/dashboard-mobile.png" width="32%" alt="Dashboard on mobile" />
+  <img src="docs/screenshots/insights-mobile.png" width="32%" alt="Insights on mobile" />
+  <img src="docs/screenshots/plans-mobile.png" width="32%" alt="Plans on mobile" />
+</p>
 
 ## Why this exists
 

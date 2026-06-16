@@ -3,6 +3,7 @@ import { NavLink, Outlet } from 'react-router-dom';
 import { lockApp, useAppData } from '../api/data';
 import { Icon, type IconName } from './ui/Icon';
 import { UpdateBanner } from './UpdateBanner';
+import { SampleBanner } from './SampleBanner';
 import { useQuickAdd } from './QuickAdd';
 
 const NAV: { to: string; label: string; icon: IconName }[] = [
@@ -16,10 +17,11 @@ const NAV: { to: string; label: string; icon: IconName }[] = [
   { to: '/settings', label: 'Settings', icon: 'gear' },
 ];
 
-// Mobile tab bar: five destinations + the FAB. Settings lives in the top bar
-// (gear); Bills & Subscriptions live in the labeled Plans ⇄ Bills ⇄
-// Subscriptions switcher under the Plans tab. Rendered 2 + FAB + 3.
-const TABS = [NAV[0], NAV[1], NAV[2], NAV[3], NAV[6]];
+// Mobile tab bar: four destinations symmetric around the centered FAB
+// (2 + FAB + 2). Settings lives in the top bar (gear); Bills & Subscriptions
+// live in the labeled Plans ⇄ Bills ⇄ Subscriptions switcher under the Plans
+// tab; History is reached via click-through from summaries and the Months page.
+const TABS = [NAV[0], NAV[1], NAV[2], NAV[3]];
 
 function BrandMark() {
   return (
@@ -86,6 +88,15 @@ export function Layout() {
           Tower
         </span>
         <span className="topbar__actions">
+          {/* History lives here on mobile (not on the tab bar): a global utility
+              action like lock/settings, same 'filter' icon as the desktop sidebar. */}
+          <NavLink
+            to="/history"
+            className={({ isActive }) => `icon-btn${isActive ? ' is-active' : ''}`}
+            aria-label="History"
+          >
+            <Icon name="filter" size={18} />
+          </NavLink>
           {authEnabled && (
             <button className="icon-btn" onClick={lock} aria-label="Lock app">
               <Icon name="lock" size={18} />
@@ -99,6 +110,7 @@ export function Layout() {
 
       <main className="main">
         <UpdateBanner />
+        <SampleBanner />
         <Outlet />
       </main>
 
