@@ -110,6 +110,43 @@
   text-decoration: underline;
 }
 
+/* --- payday verdict banner (UpcomingCard) --------------------------------------- */
+
+/* structural only; the tint background + accent color are set inline because they
+   vary with the verdict status (okay/tight/trouble). */
+.verdict {
+  display: flex;
+  gap: var(--space-3);
+  align-items: center;
+  padding: var(--space-3) var(--space-4);
+  border-radius: 12px;
+  margin-bottom: var(--space-4);
+}
+
+.verdict__dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex: 0 0 auto;
+}
+
+.verdict__body { min-width: 0; }
+
+/* one-time "what am I looking at?" hint under the verdict (dismissible) */
+.coach-tip {
+  gap: var(--space-3);
+  padding: var(--space-3);
+  margin-bottom: var(--space-4);
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius-input);
+}
+
+.verdict__title { font-size: var(--text-lg); }
+
+/* the three figures under the banner: next payday / left to spend / bills */
+.verdict-cols > * { min-width: 150px; }
+.verdict-cols > .verdict-cols__bills { flex: 1 1 220px; min-width: 0; }
+
 /* --- stat cards ----------------------------------------------------------------- */
 
 .stat-card {
@@ -577,3 +614,4 @@
 }
 
 .icon-btn:hover { background: var(--surface-2); color: var(--text); }
+.icon-btn.is-active { color: var(--text); background: var(--surface-2); }

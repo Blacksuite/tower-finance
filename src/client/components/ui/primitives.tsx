@@ -113,7 +113,7 @@ export function Skeleton({ height = 16, width = '100%', style }: { height?: numb
 
 export function CardSkeleton({ lines = 3 }: { lines?: number }) {
   return (
-    <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+    <div className="card stack" style={{ gap: 'var(--space-3)' }}>
       <Skeleton width={120} height={12} />
       {Array.from({ length: lines }, (_, i) => (
         <Skeleton key={i} height={i === 0 ? 28 : 14} width={i === 0 ? '50%' : '100%'} />
@@ -138,7 +138,7 @@ export function Progress({ ratio, color }: { ratio: number; color: string }) {
 export function Section({ title, children, right }: { title: string; children: ReactNode; right?: ReactNode }) {
   return (
     <section className="card chart-card">
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 12 }}>
+      <div className="row row--between row--baseline">
         <h3 className="section-title">{title}</h3>
         {right}
       </div>
