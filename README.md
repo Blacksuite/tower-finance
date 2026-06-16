@@ -1,4 +1,7 @@
-# Tower Finance
+<h1>
+  <img src="docs/screenshots/logo.png" width="48" height="48" alt="Tower Finance logo" style="vertical-align: middle;" />
+  Tower Finance
+</h1>
 
 **Self-hosted budgeting that follows your payday, not the calendar.**
 
