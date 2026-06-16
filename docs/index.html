@@ -1,0 +1,879 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Tower Finance · Budgeting that follows your payday</title>
+<meta name="description" content="Self-hosted personal budgeting that answers one question: am I going to be okay until my next paycheck? One Docker container, one SQLite file, no bank logins, no telemetry." />
+<meta property="og:title" content="Tower Finance · Budgeting that follows your payday" />
+<meta property="og:description" content="Self-hosted personal budgeting that answers one question: am I going to be okay until my next paycheck?" />
+<meta property="og:type" content="website" />
+<meta property="og:image" content="screenshots/dashboard.png" />
+<meta name="twitter:card" content="summary_large_image" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+<link rel="icon" type="image/png" href="screenshots/logo.png">
+<style>
+  :root{
+    --bg:#08090b;
+    --bg-2:#0d0f12;
+    --surface:#121519;
+    --surface-2:#171b20;
+    --border:#22272e;
+    --border-soft:#1a1f25;
+    --text:#f1f3f5;
+    --text-muted:#8b949e;
+    --text-faded:#6e7681;
+    --accent:#10b981;
+    --accent-soft:#34d39933;
+    --accent-glow:rgba(16,185,129,0.18);
+    --warn:#f59e0b;
+    --danger:#ef4444;
+    --radius:14px;
+    --radius-sm:8px;
+  }
+  *{box-sizing:border-box;}
+  html{scroll-behavior:smooth;}
+  body{
+    margin:0;
+    background:var(--bg);
+    color:var(--text);
+    font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+    font-feature-settings:'cv11','ss01','ss03';
+    -webkit-font-smoothing:antialiased;
+    line-height:1.55;
+    overflow-x:hidden;
+  }
+  ::selection{background:var(--accent-glow); color:var(--text);}
+
+  /* layout */
+  .wrap{max-width:1120px; margin:0 auto; padding:0 24px;}
+  .wrap-narrow{max-width:780px; margin:0 auto; padding:0 24px;}
+  @media (max-width:640px){
+    .wrap, .wrap-narrow{padding:0 28px;}
+  }
+
+  /* nav */
+  nav.top{
+    position:sticky; top:0; z-index:50;
+    backdrop-filter:saturate(140%) blur(18px);
+    background:rgba(8,9,11,0.72);
+    border-bottom:1px solid var(--border-soft);
+  }
+  nav.top .inner{
+    display:flex; align-items:center; justify-content:space-between;
+    padding-top:14px; padding-bottom:14px;
+  }
+  .brand{
+    display:flex; align-items:center; gap:10px;
+    font-family:'Space Grotesk',sans-serif;
+    font-weight:700; font-size:1.05rem;
+    color:var(--text); text-decoration:none;
+    letter-spacing:-0.01em;
+  }
+  .brand-mark{
+    width:32px; height:32px;
+    display:grid; place-items:center;
+    flex-shrink:0;
+  }
+  .brand-mark img{width:100%; height:100%; object-fit:contain;}
+  .nav-links{display:flex; gap:28px; align-items:center;}
+  .nav-links a{
+    color:var(--text-muted); text-decoration:none; font-size:0.92rem;
+    transition:color 0.15s ease;
+  }
+  .nav-links a:hover{color:var(--text);}
+  .nav-cta{
+    background:var(--text); color:var(--bg); border-radius:7px;
+    padding:7px 14px; font-weight:600; font-size:0.88rem;
+    text-decoration:none; transition:opacity 0.15s ease;
+  }
+  .nav-cta:hover{opacity:0.85;}
+
+  /* hero */
+  .hero{
+    position:relative; padding:90px 0 40px;
+    text-align:center;
+    overflow:hidden;
+  }
+  .hero::before{
+    content:''; position:absolute;
+    top:-20%; left:50%; transform:translateX(-50%);
+    width:900px; height:600px;
+    background:radial-gradient(ellipse at center, var(--accent-glow), transparent 60%);
+    pointer-events:none; z-index:0;
+  }
+  .hero .content{position:relative; z-index:1;}
+  .pill{
+    display:inline-flex; align-items:center; gap:8px;
+    padding:6px 14px;
+    background:var(--surface);
+    border:1px solid var(--border);
+    border-radius:999px;
+    font-size:0.82rem; color:var(--text-muted);
+    margin-bottom:24px;
+  }
+  .pill .dot{
+    width:6px; height:6px; border-radius:50%;
+    background:var(--accent); box-shadow:0 0 8px var(--accent);
+  }
+  h1.hero-title{
+    font-family:'Space Grotesk',sans-serif;
+    font-size:clamp(2.2rem, 5vw, 3.8rem);
+    font-weight:700; line-height:1.05;
+    margin:0 0 22px;
+    letter-spacing:-0.025em;
+    background:linear-gradient(180deg, #fff 0%, #c1c5cb 100%);
+    -webkit-background-clip:text;
+    background-clip:text;
+    -webkit-text-fill-color:transparent;
+  }
+  h1.hero-title .accent{
+    background:linear-gradient(180deg, #34d399 0%, #10b981 100%);
+    -webkit-background-clip:text;
+    background-clip:text;
+    -webkit-text-fill-color:transparent;
+  }
+  p.hero-sub{
+    font-size:clamp(1rem, 1.5vw, 1.2rem);
+    color:var(--text-muted);
+    max-width:580px;
+    margin:0 auto 36px;
+  }
+  .cta-row{
+    display:flex; gap:12px; justify-content:center; flex-wrap:wrap;
+    margin-bottom:18px;
+  }
+  .btn{
+    display:inline-flex; align-items:center; gap:8px;
+    padding:13px 22px; border-radius:9px;
+    font-weight:600; font-size:0.95rem;
+    text-decoration:none;
+    border:1px solid transparent;
+    transition:transform 0.12s ease, box-shadow 0.18s ease, background 0.15s ease;
+  }
+  .btn-primary{
+    background:var(--text); color:var(--bg);
+    box-shadow:0 1px 0 rgba(255,255,255,0.15) inset, 0 6px 24px rgba(0,0,0,0.45);
+  }
+  .btn-primary:hover{transform:translateY(-1px); box-shadow:0 10px 30px rgba(0,0,0,0.5);}
+  .btn-secondary{
+    background:var(--surface); color:var(--text);
+    border-color:var(--border);
+  }
+  .btn-secondary:hover{background:var(--surface-2); border-color:#2c333a;}
+  .meta-row{
+    display:flex; gap:24px; justify-content:center; flex-wrap:wrap;
+    font-size:0.85rem; color:var(--text-faded);
+    margin-top:8px;
+  }
+  .meta-row span{display:inline-flex; align-items:center; gap:6px;}
+
+  /* hero shot */
+  .hero-shot-wrap{
+    position:relative; max-width:980px; margin:64px auto 0;
+    padding:0 24px;
+  }
+  @media (max-width:640px){
+    .hero-shot-wrap{padding:0 28px;}
+  }
+  .hero-shot{
+    width:100%; border-radius:14px;
+    border:1px solid var(--border);
+    box-shadow:
+      0 0 0 1px rgba(255,255,255,0.04),
+      0 30px 80px -20px rgba(0,0,0,0.7),
+      0 0 80px -20px var(--accent-glow);
+    display:block;
+  }
+  .hero-shot-wrap::after{
+    content:''; position:absolute;
+    inset:auto 16px -20px;
+    height:60px;
+    background:linear-gradient(180deg, transparent, var(--bg));
+    pointer-events:none;
+  }
+
+  /* section base */
+  section{padding:96px 0; position:relative;}
+  .eyebrow{
+    display:inline-block;
+    font-size:0.78rem; font-weight:600;
+    text-transform:uppercase; letter-spacing:0.12em;
+    color:var(--accent);
+    margin-bottom:16px;
+  }
+  h2.section-title{
+    font-family:'Space Grotesk',sans-serif;
+    font-size:clamp(1.7rem, 3vw, 2.4rem);
+    font-weight:700; line-height:1.15;
+    letter-spacing:-0.02em;
+    margin:0 0 18px;
+  }
+  p.section-lead{
+    font-size:1.08rem; color:var(--text-muted);
+    margin:0 0 48px; max-width:600px;
+  }
+
+  /* problem section */
+  .problem-grid{
+    display:grid; grid-template-columns:1fr 1fr; gap:20px;
+    margin-top:32px;
+  }
+  .problem-card{
+    background:var(--surface);
+    border:1px solid var(--border);
+    border-radius:var(--radius);
+    padding:28px;
+  }
+  .problem-card.bad{border-color:rgba(239,68,68,0.25);}
+  .problem-card.good{border-color:rgba(16,185,129,0.3);}
+  .problem-card h3{
+    margin:0 0 10px; font-size:1.05rem;
+    display:flex; align-items:center; gap:8px;
+  }
+  .problem-card .icon{
+    width:24px; height:24px; border-radius:6px;
+    display:grid; place-items:center; font-size:0.8rem;
+  }
+  .problem-card.bad .icon{background:rgba(239,68,68,0.15); color:#fca5a5;}
+  .problem-card.good .icon{background:rgba(16,185,129,0.15); color:#6ee7b7;}
+  .problem-card p{color:var(--text-muted); margin:0 0 16px; font-size:0.95rem;}
+  .cycle-vis{
+    background:var(--bg-2);
+    border:1px solid var(--border-soft);
+    border-radius:var(--radius-sm);
+    padding:14px; font-family:'Space Grotesk',sans-serif;
+    font-size:0.85rem;
+  }
+  .cycle-vis .label{color:var(--text-faded); font-size:0.72rem; text-transform:uppercase; letter-spacing:0.08em; margin-bottom:8px;}
+  .cycle-vis .bar{height:8px; border-radius:4px; background:var(--border); position:relative; overflow:hidden; margin-bottom:6px;}
+  .cycle-vis .seg{position:absolute; height:100%; border-radius:4px;}
+  .cycle-vis .row{display:flex; justify-content:space-between; font-size:0.8rem; color:var(--text-muted);}
+  .cycle-vis .row strong{color:var(--text);}
+
+  /* features grid */
+  .features{
+    display:grid; grid-template-columns:repeat(3,1fr); gap:18px;
+    margin-top:8px;
+  }
+  .feat{
+    background:var(--surface);
+    border:1px solid var(--border);
+    border-radius:var(--radius);
+    padding:28px; transition:border-color 0.18s ease, transform 0.18s ease;
+  }
+  .feat:hover{border-color:#2c333a; transform:translateY(-2px);}
+  .feat .feat-icon{
+    width:42px; height:42px; border-radius:10px;
+    background:linear-gradient(135deg, var(--accent-soft), transparent);
+    border:1px solid var(--border);
+    display:grid; place-items:center;
+    margin-bottom:18px;
+    color:var(--accent);
+  }
+  .feat h3{margin:0 0 8px; font-size:1.05rem; font-weight:600;}
+  .feat p{margin:0; color:var(--text-muted); font-size:0.93rem;}
+
+  /* deep-dive sections */
+  .deepdive{
+    display:grid; grid-template-columns:1fr 1.2fr; gap:60px;
+    align-items:center;
+  }
+  .deepdive.reverse{grid-template-columns:1.2fr 1fr;}
+  .deepdive.reverse .copy{order:2;}
+  .deepdive img{
+    width:100%; border-radius:12px;
+    border:1px solid var(--border);
+    box-shadow:0 20px 60px -20px rgba(0,0,0,0.6);
+  }
+  .deepdive h3{
+    font-family:'Space Grotesk',sans-serif;
+    font-size:1.7rem; font-weight:700;
+    letter-spacing:-0.015em;
+    margin:0 0 14px;
+  }
+  .deepdive p{color:var(--text-muted); font-size:1rem; margin:0 0 18px;}
+  .deepdive ul{
+    list-style:none; padding:0; margin:0;
+    display:flex; flex-direction:column; gap:10px;
+  }
+  .deepdive li{
+    padding-left:24px; position:relative;
+    color:var(--text-muted); font-size:0.95rem;
+  }
+  .deepdive li::before{
+    content:''; position:absolute; left:0; top:9px;
+    width:5px; height:5px; border-radius:50%;
+    background:var(--accent);
+  }
+
+  /* trust section */
+  .trust{background:var(--bg-2); border-top:1px solid var(--border-soft); border-bottom:1px solid var(--border-soft);}
+  .trust-grid{
+    display:grid; grid-template-columns:repeat(4,1fr); gap:18px;
+  }
+  .trust-card{
+    text-align:center; padding:28px 16px;
+    background:var(--surface);
+    border:1px solid var(--border);
+    border-radius:var(--radius);
+  }
+  .trust-card .num{
+    font-family:'Space Grotesk',sans-serif;
+    font-size:1.8rem; font-weight:700; color:var(--accent);
+    letter-spacing:-0.02em;
+    margin-bottom:6px;
+  }
+  .trust-card .lbl{font-size:0.85rem; color:var(--text-muted);}
+
+  /* how it works */
+  .steps{display:grid; grid-template-columns:repeat(3,1fr); gap:18px; counter-reset:step;}
+  .step{
+    background:var(--surface);
+    border:1px solid var(--border);
+    border-radius:var(--radius);
+    padding:28px;
+    position:relative;
+  }
+  .step::before{
+    counter-increment:step;
+    content:counter(step);
+    position:absolute; top:24px; right:24px;
+    font-family:'Space Grotesk',sans-serif;
+    font-size:2.2rem; font-weight:700;
+    color:var(--border);
+    line-height:1;
+  }
+  .step h3{margin:0 0 10px; font-size:1.05rem;}
+  .step p{margin:0; color:var(--text-muted); font-size:0.93rem;}
+  .step code{
+    display:inline-block;
+    background:var(--bg-2);
+    border:1px solid var(--border-soft);
+    border-radius:6px;
+    padding:2px 8px;
+    font-size:0.82rem;
+    font-family:ui-monospace, 'SF Mono', Menlo, monospace;
+    color:var(--accent);
+  }
+
+  /* code block */
+  .code-block{
+    background:var(--bg-2);
+    border:1px solid var(--border);
+    border-radius:var(--radius);
+    overflow:hidden;
+    margin-top:32px;
+  }
+  .code-block .head{
+    display:flex; align-items:center; justify-content:space-between;
+    padding:10px 16px;
+    background:var(--surface);
+    border-bottom:1px solid var(--border-soft);
+    font-size:0.82rem; color:var(--text-muted);
+  }
+  .code-block .dots{display:flex; gap:6px;}
+  .code-block .dots span{
+    width:10px; height:10px; border-radius:50%;
+    background:var(--border);
+  }
+  .code-block pre{
+    margin:0; padding:18px 20px;
+    font-family:ui-monospace, 'SF Mono', Menlo, monospace;
+    font-size:0.86rem; line-height:1.7;
+    overflow-x:auto; color:#cdd2d8;
+  }
+  .code-block .k{color:#7dd3fc;}
+  .code-block .v{color:#a7f3d0;}
+  .code-block .c{color:var(--text-faded); font-style:italic;}
+
+  /* faq */
+  .faq{display:flex; flex-direction:column; gap:10px; margin-top:8px;}
+  .faq details{
+    background:var(--surface);
+    border:1px solid var(--border);
+    border-radius:var(--radius-sm);
+    overflow:hidden;
+  }
+  .faq summary{
+    padding:18px 22px;
+    font-weight:600; font-size:0.98rem;
+    cursor:pointer; list-style:none;
+    display:flex; align-items:center; justify-content:space-between;
+    transition:background 0.15s ease;
+  }
+  .faq summary::-webkit-details-marker{display:none;}
+  .faq summary::after{
+    content:'+'; font-size:1.4rem; font-weight:400;
+    color:var(--text-muted); transition:transform 0.2s ease;
+  }
+  .faq details[open] summary::after{transform:rotate(45deg);}
+  .faq summary:hover{background:var(--surface-2);}
+  .faq .body{
+    padding:0 22px 22px;
+    color:var(--text-muted); font-size:0.95rem;
+  }
+
+  /* final cta */
+  .final-cta{
+    text-align:center;
+    padding:80px 24px;
+    background:linear-gradient(180deg, var(--bg-2) 0%, var(--bg) 100%);
+    border:1px solid var(--border);
+    border-radius:18px;
+    position:relative; overflow:hidden;
+    margin:32px 0;
+  }
+  .final-cta::before{
+    content:''; position:absolute;
+    top:0; left:50%; transform:translateX(-50%);
+    width:600px; height:300px;
+    background:radial-gradient(ellipse at top, var(--accent-glow), transparent 70%);
+    pointer-events:none;
+  }
+  .final-cta > *{position:relative;}
+  .final-cta h2{
+    font-family:'Space Grotesk',sans-serif;
+    font-size:clamp(1.6rem, 3vw, 2.2rem);
+    font-weight:700; margin:0 0 14px;
+    letter-spacing:-0.02em;
+  }
+  .final-cta p{color:var(--text-muted); max-width:520px; margin:0 auto 28px;}
+
+  /* footer */
+  footer{
+    padding:48px 0 32px;
+    border-top:1px solid var(--border-soft);
+    color:var(--text-faded);
+    font-size:0.88rem;
+  }
+  footer .grid{
+    display:grid; grid-template-columns:2fr 1fr 1fr 1fr; gap:32px;
+    margin-bottom:32px;
+  }
+  footer h4{
+    margin:0 0 14px; font-size:0.82rem;
+    text-transform:uppercase; letter-spacing:0.1em;
+    color:var(--text-muted);
+  }
+  footer ul{list-style:none; padding:0; margin:0; display:flex; flex-direction:column; gap:8px;}
+  footer a{color:var(--text-faded); text-decoration:none; transition:color 0.15s ease;}
+  footer a:hover{color:var(--text);}
+  footer .colophon{
+    display:flex; justify-content:space-between; align-items:center;
+    padding-top:24px; border-top:1px solid var(--border-soft);
+    flex-wrap:wrap; gap:12px;
+  }
+
+  /* responsive */
+  @media (max-width:640px){
+    .lg-only{display:none;}
+  }
+  @media (max-width:860px){
+    .features, .trust-grid, .steps{grid-template-columns:1fr 1fr;}
+    .problem-grid{grid-template-columns:1fr;}
+    .deepdive, .deepdive.reverse{grid-template-columns:1fr; gap:24px;}
+    .deepdive.reverse .copy{order:initial;}
+    footer .grid{grid-template-columns:1fr 1fr;}
+    .nav-links{display:none;}
+    .nav-cta{display:inline-block;}
+    section{padding:64px 0;}
+    .hero{padding:60px 0 20px;}
+  }
+  @media (max-width:560px){
+    .features, .trust-grid, .steps, footer .grid{grid-template-columns:1fr;}
+  }
+</style>
+</head>
+<body>
+
+<nav class="top">
+  <div class="wrap inner">
+    <a class="brand" href="#top">
+      <span class="brand-mark"><img src="screenshots/logo.png" alt=""></span>
+      Tower Finance
+    </a>
+    <div class="nav-links">
+      <a href="#features">Features</a>
+      <a href="#how">How it works</a>
+      <a href="#faq">FAQ</a>
+      <a href="https://github.com/Blacksuite/tower-finance">GitHub</a>
+    </div>
+    <a class="nav-cta" href="#start">Self-host it</a>
+  </div>
+</nav>
+
+<header class="hero" id="top">
+  <div class="wrap content">
+    <div class="pill">
+      <span class="dot"></span>
+      Open source · MIT licensed · No telemetry
+    </div>
+    <h1 class="hero-title">
+      Budgeting that follows<br class="lg-only"/> your <span class="accent">payday</span>, not the calendar.
+    </h1>
+    <p class="hero-sub">
+      A self-hosted budgeting app that answers one question:
+      <strong>am I going to be okay until my next paycheck?</strong>
+    </p>
+    <div class="cta-row">
+      <a class="btn btn-primary" href="#start">
+        Get started in 30 seconds
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+      </a>
+      <a class="btn btn-secondary" href="https://github.com/Blacksuite/tower-finance">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 .5C5.65.5.5 5.65.5 12c0 5.08 3.29 9.39 7.86 10.91.58.1.79-.25.79-.56v-2c-3.2.7-3.88-1.37-3.88-1.37-.52-1.34-1.27-1.69-1.27-1.69-1.04-.71.08-.7.08-.7 1.15.08 1.76 1.18 1.76 1.18 1.02 1.75 2.68 1.25 3.34.95.1-.74.4-1.25.73-1.54-2.56-.29-5.25-1.28-5.25-5.71 0-1.26.45-2.29 1.18-3.1-.12-.29-.51-1.47.11-3.06 0 0 .96-.31 3.15 1.18a10.9 10.9 0 0 1 5.74 0c2.19-1.49 3.15-1.18 3.15-1.18.62 1.59.23 2.77.11 3.06.74.81 1.18 1.84 1.18 3.1 0 4.44-2.7 5.41-5.27 5.7.41.36.78 1.06.78 2.13v3.15c0 .31.21.66.79.55C20.21 21.38 23.5 17.08 23.5 12 23.5 5.65 18.35.5 12 .5z"/></svg>
+        Star on GitHub
+      </a>
+    </div>
+    <div class="meta-row">
+      <span>✓ One Docker container</span>
+      <span>✓ One SQLite file</span>
+      <span>✓ No bank logins</span>
+    </div>
+  </div>
+
+  <div class="hero-shot-wrap">
+    <img class="hero-shot" src="screenshots/dashboard.png" alt="Tower Finance dashboard showing the payday verdict, cash-flow ribbon and commitments" loading="eager" />
+  </div>
+</header>
+
+<section id="problem">
+  <div class="wrap-narrow">
+    <span class="eyebrow">The problem</span>
+    <h2 class="section-title">Your paycheck doesn't care<br/>what month it is.</h2>
+    <p class="section-lead">
+      Most budgeting apps assume your month starts on the 1st. If you're paid
+      on the 25th, the last Friday, or every other Thursday, every report you
+      look at is off by a paycheck.
+    </p>
+  </div>
+  <div class="wrap">
+    <div class="problem-grid">
+      <div class="problem-card bad">
+        <h3><span class="icon">✕</span> Calendar months</h3>
+        <p>Salary lands May 25th, rent is paid June 1st. May looks like a big surplus, June looks like a big deficit. Neither number reflects what actually happened.</p>
+        <div class="cycle-vis">
+          <div class="label">May</div>
+          <div class="bar"><div class="seg" style="background:#10b981; width:100%; left:0;"></div></div>
+          <div class="row"><span>Income €3200</span><span><strong>+€2400</strong></span></div>
+          <div class="label" style="margin-top:14px;">June</div>
+          <div class="bar"><div class="seg" style="background:#ef4444; width:90%; left:0;"></div></div>
+          <div class="row"><span>Expenses €2880</span><span><strong>−€2880</strong></span></div>
+        </div>
+      </div>
+      <div class="problem-card good">
+        <h3><span class="icon">✓</span> Pay cycles</h3>
+        <p>Tower Finance budgets payday to payday. Income and the bills it pays sit in the same period, so the report matches what your bank account did.</p>
+        <div class="cycle-vis">
+          <div class="label">25 May to 24 Jun</div>
+          <div class="bar">
+            <div class="seg" style="background:#10b981; width:100%; left:0;"></div>
+            <div class="seg" style="background:#ef4444; width:75%; left:0;"></div>
+          </div>
+          <div class="row"><span>Income €3200 · Spent €2400</span><span><strong>€800 left</strong></span></div>
+          <div class="label" style="margin-top:14px;">25 Jun to 24 Jul</div>
+          <div class="bar">
+            <div class="seg" style="background:#10b981; width:100%; left:0;"></div>
+            <div class="seg" style="background:#ef4444; width:70%; left:0;"></div>
+          </div>
+          <div class="row"><span>Income €3200 · Spent €2240</span><span><strong>€960 left</strong></span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="features">
+  <div class="wrap">
+    <span class="eyebrow">Built for clarity</span>
+    <h2 class="section-title">One question, answered at a glance.</h2>
+    <p class="section-lead">
+      Every screen opens with a plain-language verdict. The detail is there
+      when you want it, but it isn't the first thing you see.
+    </p>
+    <div class="features">
+      <div class="feat">
+        <div class="feat-icon">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9 12l2 2 4-4"/></svg>
+        </div>
+        <h3>The payday verdict</h3>
+        <p>🟢 okay, 🟡 tight, 🔴 trouble. The headline compares the money you have left this cycle against a safety buffer you set.</p>
+      </div>
+      <div class="feat">
+        <div class="feat-icon">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l3-9 4 18 3-9h4"/></svg>
+        </div>
+        <h3>Pay-cycle math</h3>
+        <p>Budgets, insights and savings rate are bucketed by your pay cycle, so each paycheck lines up with the spending it actually pays for.</p>
+      </div>
+      <div class="feat">
+        <div class="feat-icon">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+        </div>
+        <h3>Your data, your file</h3>
+        <p>One SQLite file on your server. No cloud account, no bank credentials, no telemetry. JSON export and import, plus an optional password.</p>
+      </div>
+      <div class="feat">
+        <div class="feat-icon">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+        </div>
+        <h3>Bills, subs, plans</h3>
+        <p>Bills, subscriptions and payment plans all flow into the verdict automatically. Override any individual month when life is weird.</p>
+      </div>
+      <div class="feat">
+        <div class="feat-icon">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20v-6M6 20V10M18 20V4"/></svg>
+        </div>
+        <h3>Insights without noise</h3>
+        <p>Top spending, budget vs actual, income allocation, savings rate. Each chart maps to a decision you'd actually make about next cycle.</p>
+      </div>
+      <div class="feat">
+        <div class="feat-icon">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="2" width="14" height="20" rx="2"/><path d="M11 18h2"/></svg>
+        </div>
+        <h3>Installable PWA</h3>
+        <p>Add it to your phone's home screen and it opens fullscreen like a native app. A routine transaction takes about three taps.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section style="background:var(--bg-2); border-top:1px solid var(--border-soft); border-bottom:1px solid var(--border-soft);">
+  <div class="wrap">
+    <div class="deepdive">
+      <div class="copy">
+        <span class="eyebrow">Insights</span>
+        <h3>Trends bucketed by the cycle that funded them.</h3>
+        <p>
+          If payday isn't the 1st, a calendar-month chart strands each paycheck
+          from the spending it funds. Tower Finance buckets the Insights charts
+          by your pay cycle instead, so the numbers line up with the dashboard.
+        </p>
+        <ul>
+          <li>Top spending categories with budget context</li>
+          <li>Income allocation: what % went where this cycle</li>
+          <li>Savings rate trend across cycles</li>
+          <li>Budget vs actual progress bars, monthly and YTD</li>
+        </ul>
+      </div>
+      <img src="screenshots/insights.png" alt="Insights screen showing top spending, allocation and savings rate" loading="lazy" />
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <div class="deepdive reverse">
+      <img src="screenshots/months.png" alt="Months screen with cash flow by pay cycle" loading="lazy" />
+      <div class="copy">
+        <span class="eyebrow">Months</span>
+        <h3>Every cycle, side by side.</h3>
+        <p>
+          Browse past cycles like pages in a journal. Income, expenses,
+          subscription charges, bill occurrences and plan installments are listed
+          for each cycle, in the period that actually paid them.
+        </p>
+        <ul>
+          <li>Cycle / calendar toggle for month-by-month reporting</li>
+          <li>Read-only virtual rows for recurring items (bills/subs/plans)</li>
+          <li>One-tap drill into any cycle's history</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="trust">
+  <div class="wrap">
+    <span class="eyebrow">What you don't get</span>
+    <h2 class="section-title">Your finances stay<br/>on your machine.</h2>
+    <p class="section-lead">
+      Financial data is sensitive, and the project treats it that way. The
+      choices below aren't on a roadmap to change.
+    </p>
+    <div class="trust-grid">
+      <div class="trust-card">
+        <div class="num">0</div>
+        <div class="lbl">Lines of telemetry code</div>
+      </div>
+      <div class="trust-card">
+        <div class="num">0</div>
+        <div class="lbl">Bank credentials handled</div>
+      </div>
+      <div class="trust-card">
+        <div class="num">1</div>
+        <div class="lbl">SQLite file you can copy anywhere</div>
+      </div>
+      <div class="trust-card">
+        <div class="num">MIT</div>
+        <div class="lbl">Open source, audit the code yourself</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="how">
+  <div class="wrap">
+    <span class="eyebrow">How it works</span>
+    <h2 class="section-title">Up and running in 30 seconds.</h2>
+    <p class="section-lead">
+      Drop a compose file on a server you already run, then open the URL.
+      First-run onboarding sets your payday and a safety buffer. There's also
+      a one-tap sample-data mode if you'd rather poke around first.
+    </p>
+    <div class="steps">
+      <div class="step">
+        <h3>Pull the image</h3>
+        <p>Pre-built multi-arch container on GHCR. Pin a version or track <code>:latest</code>.</p>
+      </div>
+      <div class="step">
+        <h3>Mount one volume</h3>
+        <p>Everything lives in <code>./data/tower.db</code>. Back it up by copying the file.</p>
+      </div>
+      <div class="step">
+        <h3>Open and budget</h3>
+        <p>30-second onboarding, then start logging. Or load the sample data first.</p>
+      </div>
+    </div>
+    <div class="code-block" id="start">
+      <div class="head">
+        <div class="dots"><span></span><span></span><span></span></div>
+        <span>docker-compose.yml</span>
+      </div>
+<pre><span class="c"># Drop this in a folder, then: docker compose up -d</span>
+<span class="k">services</span>:
+  <span class="k">tower-finance</span>:
+    <span class="k">image</span>: <span class="v">ghcr.io/blacksuite/tower-finance:latest</span>
+    <span class="k">container_name</span>: <span class="v">tower-finance</span>
+    <span class="k">ports</span>:
+      - <span class="v">"3210:3210"</span>
+    <span class="k">volumes</span>:
+      - <span class="v">./data:/app/data</span>
+    <span class="k">restart</span>: <span class="v">unless-stopped</span></pre>
+    </div>
+  </div>
+</section>
+
+<section id="faq">
+  <div class="wrap-narrow">
+    <span class="eyebrow">Common questions</span>
+    <h2 class="section-title">FAQ</h2>
+    <div class="faq">
+      <details>
+        <summary>Does it connect to my bank?</summary>
+        <div class="body">No, and it isn't planned. Manual entry takes about three taps per
+        transaction, and that small friction is part of the point: you notice
+        what you spend. CSV import may show up later as an option.</div>
+      </details>
+      <details>
+        <summary>Is it really single-user?</summary>
+        <div class="body">For now, yes. One install per household. Multi-user and shared budgets
+        are on the roadmap, but the single-user experience needs to be finished
+        first.</div>
+      </details>
+      <details>
+        <summary>What if I get paid on the 1st like a normal budgeting app expects?</summary>
+        <div class="body">Then your pay cycles are calendar months, which is the default if you
+        keep salary day at 1. The app works the same for you; it just stops
+        treating everyone else's pay schedule like an edge case.</div>
+      </details>
+      <details>
+        <summary>How do I back up my data?</summary>
+        <div class="body">It's a single SQLite file at <code>./data/tower.db</code>. Copy the
+        file with whatever you already use for backups. There's also a one-click
+        JSON export and import inside the app.</div>
+      </details>
+      <details>
+        <summary>Can I expose it to the internet?</summary>
+        <div class="body">Yes. Enable the optional password and put it behind HTTPS (a reverse
+        proxy works). Sessions live in an httpOnly cookie, login is rate
+        limited, and nothing auth-related sits in localStorage. The app is
+        still meant for one trusted user.</div>
+      </details>
+      <details>
+        <summary>How do I update it?</summary>
+        <div class="body"><code>docker compose pull && docker compose up -d</code>. Schema
+        migrations run on start, and Watchtower handles it too if that's how
+        you update your other containers. Pin a tag instead of <code>:latest</code>
+        if you want to control when updates land.</div>
+      </details>
+      <details>
+        <summary>Is it free? Really?</summary>
+        <div class="body">Yes. MIT licensed, free forever to self-host. If it ends up saving
+        you a budgeting-app subscription, there's a
+        <a href="https://ko-fi.com" style="color:var(--accent);">Ko-fi</a> and
+        a GitHub Sponsors link in the footer. Neither is asked for.</div>
+      </details>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <div class="final-cta">
+      <h2>See your real cash flow.</h2>
+      <p>Free, open source, and runs on a server you already own. A compose
+        file and one open port is all the setup there is.</p>
+      <div class="cta-row">
+        <a class="btn btn-primary" href="https://github.com/Blacksuite/tower-finance">
+          Get started on GitHub
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+        </a>
+        <a class="btn btn-secondary" href="https://github.com/Blacksuite/tower-finance/discussions">
+          Join the discussion
+        </a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <div class="grid">
+      <div>
+        <a class="brand" href="#top" style="margin-bottom:14px;">
+          <span class="brand-mark"><img src="screenshots/logo.png" alt=""></span>
+          Tower Finance
+        </a>
+        <p style="margin:14px 0 0; max-width:320px; color:var(--text-faded);">
+          A self-hosted personal finance PWA built around one question:
+          am I okay until payday?
+        </p>
+      </div>
+      <div>
+        <h4>Product</h4>
+        <ul>
+          <li><a href="#features">Features</a></li>
+          <li><a href="#how">How it works</a></li>
+          <li><a href="#faq">FAQ</a></li>
+        </ul>
+      </div>
+      <div>
+        <h4>Project</h4>
+        <ul>
+          <li><a href="https://github.com/Blacksuite/tower-finance">GitHub</a></li>
+          <li><a href="https://github.com/Blacksuite/tower-finance/releases">Releases</a></li>
+          <li><a href="https://github.com/Blacksuite/tower-finance/discussions">Discussions</a></li>
+          <li><a href="https://github.com/Blacksuite/tower-finance/issues">Issues</a></li>
+        </ul>
+      </div>
+      <div>
+        <h4>Support</h4>
+        <ul>
+          <li><a href="https://github.com/sponsors/Blacksuite">GitHub Sponsors</a></li>
+          <li><a href="https://ko-fi.com">Ko-fi</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="colophon">
+      <span>© 2026 Tower Finance · MIT licensed</span>
+      <span>Made by a solo developer who got tired of calendar-month budgets.</span>
+    </div>
+  </div>
+</footer>
+
+</body>
+</html>

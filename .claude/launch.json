@@ -6,6 +6,12 @@
       "runtimeExecutable": "node",
       "runtimeArgs": ["dist/server/index.js"],
       "port": 3210
+    },
+    {
+      "name": "tower-finance-site",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": ["-m", "http.server", "8420", "--directory", "docs"],
+      "port": 8420
     }
   ]
 }
