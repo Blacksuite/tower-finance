@@ -193,6 +193,10 @@ hear what works and what doesn't.
 No telemetry means I can't see how it's used — so a one-line "it works on my
 Synology" is genuinely useful.
 
+If Tower Finance saves you a budgeting-app subscription, you can buy me a
+coffee on [Ko-fi](https://ko-fi.com/blacksuite). Never asked for, always
+appreciated.
+
 ## License
 
 [MIT](LICENSE) — free and open source. Self-host it, fork it, make it yours.
