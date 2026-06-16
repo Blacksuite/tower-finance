@@ -9,6 +9,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Build & publish](https://github.com/Blacksuite/tower-finance/actions/workflows/release.yml/badge.svg)](https://github.com/Blacksuite/tower-finance/actions/workflows/release.yml)
 [![Container](https://img.shields.io/badge/ghcr.io-blacksuite%2Ftower--finance-2496ED?logo=docker&logoColor=white)](https://github.com/Blacksuite/tower-finance/pkgs/container/tower-finance)
+[![Ko-fi](https://img.shields.io/badge/Ko--fi-Support-FF5E5B?logo=ko-fi&logoColor=white)](https://ko-fi.com/blacksuite)
 
 Tower Finance answers one question, at a glance: **am I going to be okay until
 my next paycheck?** It opens with a single plain-language verdict — 🟢 okay,
