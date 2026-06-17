@@ -8,7 +8,7 @@
 
 [Live overview & screenshots →](https://blacksuite.github.io/tower-finance/)
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![License: AGPL v3](https://img.shields.io/badge/License-AGPL%20v3-blue.svg)](LICENSE)
 [![Build & publish](https://github.com/Blacksuite/tower-finance/actions/workflows/release.yml/badge.svg)](https://github.com/Blacksuite/tower-finance/actions/workflows/release.yml)
 [![Container](https://img.shields.io/badge/ghcr.io-blacksuite%2Ftower--finance-2496ED?logo=docker&logoColor=white)](https://github.com/Blacksuite/tower-finance/pkgs/container/tower-finance)
 [![Ko-fi](https://img.shields.io/badge/Ko--fi-Support-FF5E5B?logo=ko-fi&logoColor=white)](https://ko-fi.com/blacksuite)
@@ -202,4 +202,6 @@ appreciated.
 
 ## License
 
-[MIT](LICENSE) — free and open source. Self-host it, fork it, make it yours.
+[AGPL-3.0](LICENSE) — free and open source. Self-host it, fork it, make it
+yours. If you modify it and run it as a network service, the AGPL asks you to
+share those changes back.
