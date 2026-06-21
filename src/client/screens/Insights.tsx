@@ -64,9 +64,9 @@ export function Insights() {
   const rangeLabel =
     range === 'month' ? (cyclic ? 'this pay cycle' : 'this month') : range === 'ytd' ? (cyclic ? 'YTD pay cycles' : 'YTD') : 'all time';
 
-  // a category row drills through to its expenses in History
+  // a category row drills through to its expenses in Transactions
   const seeCategory = (categoryId: string) =>
-    navigate(`/history?type=expense&categoryId=${encodeURIComponent(categoryId)}`);
+    navigate(`/transactions?type=expense&categoryId=${encodeURIComponent(categoryId)}`);
 
   return (
     <div className="stack">

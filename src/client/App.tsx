@@ -3,8 +3,7 @@ import { useEffect, useState } from 'react';
 import { Route, BrowserRouter, Routes, useLocation } from 'react-router-dom';
 import { useAppData } from './api/data';
 import { configureFormat } from '../shared/format';
-import { History } from './screens/History';
-import { Subscriptions } from './screens/Subscriptions';
+import { Transactions } from './screens/Transactions';
 import { Layout } from './components/Layout';
 import { Onboarding, isFreshInstall } from './components/Onboarding';
 import { QuickAddProvider } from './components/QuickAdd';
@@ -113,8 +112,7 @@ export function App() {
                 <Route path="insights" element={<Insights />} />
                 <Route path="plans" element={<Plans />} />
                 <Route path="bills" element={<Bills />} />
-                <Route path="subscriptions" element={<Subscriptions />} />
-                <Route path="history" element={<History />} />
+                <Route path="transactions" element={<Transactions />} />
                 <Route path="settings" element={<Settings />} />
               </Route>
             </Routes>

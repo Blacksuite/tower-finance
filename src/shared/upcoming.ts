@@ -4,7 +4,6 @@ import { billCountedAmount, billOccurrencesBetween } from './bills';
 import { planExpensesForMonth, round2 } from './calc';
 import { addDays, addMonths, cycleBounds, cycleKeyOf, salaryDate } from './cycles';
 import { daysBetween, nextPayday } from './income';
-import { occurrencesBetween } from './recurring';
 import type { AppData } from './types';
 
 export interface UpcomingBill {
@@ -51,11 +50,6 @@ export function upcomingView(data: AppData, today: string): UpcomingView {
   const bills: UpcomingBill[] = [];
   const from = addDays(today, 1);
   const to = addDays(payday.date, -1);
-  for (const sub of data.subscriptions) {
-    for (const date of occurrencesBetween(sub, from, to)) {
-      bills.push({ name: sub.name, date, amount: sub.amount });
-    }
-  }
   for (const bill of data.bills) {
     for (const date of billOccurrencesBetween(bill, from, to)) {
       bills.push({ name: bill.name, date, amount: billCountedAmount(bill, date, data.billPayments) });
@@ -73,9 +67,6 @@ export function upcomingView(data: AppData, today: string): UpcomingView {
     flow += tx.type === 'income' ? tx.amount : -tx.amount;
   }
   let pastVirtual = 0;
-  for (const sub of data.subscriptions) {
-    pastVirtual += occurrencesBetween(sub, start, today).length * sub.amount;
-  }
   for (const bill of data.bills) {
     for (const date of billOccurrencesBetween(bill, start, today)) {
       pastVirtual += billCountedAmount(bill, date, data.billPayments);

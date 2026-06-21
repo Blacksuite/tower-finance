@@ -22,7 +22,7 @@ const PERIODS: { value: Period; label: string }[] = [
 
 const TX_TYPES: TransactionType[] = ['income', 'expense', 'saving', 'investment'];
 
-export function History() {
+export function Transactions() {
   const { data, isLoading } = useAppData();
   const currentCycle = useCurrentCycle();
   const today = todayISO();
@@ -65,7 +65,7 @@ export function History() {
         (categoryId === '' ? t.categoryId === null && t.type === 'expense' : t.categoryId === categoryId));
 
     const real = data.transactions.filter(matches);
-    // Computed expenses (subscriptions/bills/plan installments). Cap the window at
+    // Computed expenses (bills/plan installments). Cap the window at
     // the END of the current cycle, not at `today`: the dashboard and Months page
     // count the whole current cycle's charges as committed, so History must show
     // the same occurrences to reconcile. The cap also bounds open-ended ranges
@@ -95,7 +95,7 @@ export function History() {
   return (
     <div className="stack">
       <div className="screen-head">
-        <h1 className="screen-title">History</h1>
+        <h1 className="screen-title">Transactions</h1>
       </div>
 
       <div className="card" style={{ display: 'flex', flexWrap: 'wrap', gap: 12 }}>
@@ -156,7 +156,7 @@ export function History() {
       </Section>
       <span className="hint" style={{ textAlign: 'center' }}>
         Net uses {TYPE_SIGNS.income === '+' ? '+' : ''}income − everything else. Tap a logged row to edit;
-        subscription, bill &amp; plan rows are computed — tap to manage them.
+        bill &amp; plan rows are computed — tap to manage them.
       </span>
     </div>
   );

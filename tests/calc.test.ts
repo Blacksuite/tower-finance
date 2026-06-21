@@ -42,8 +42,6 @@ const emptyData = (
   categories: [],
   plans: [],
   planPayments: [],
-  subscriptions: [],
-  templates: [],
   incomes: [],
   bills: [],
   billPayments: [],

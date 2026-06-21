@@ -2,20 +2,17 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useEffect, useRef, useState } from 'react';
 import { salaryDate } from '../../shared/cycles';
 import { fmtDate, fmtEUR, currentMonthISO } from '../../shared/format';
-import type { BillingFrequency, Category, ExpenseTemplate } from '../../shared/types';
+import type { Category } from '../../shared/types';
 import {
   clearAllData,
   importData,
   loadSampleData,
   manageAuth,
   useAddCategory,
-  useAddTemplate,
   useAppData,
   useDeleteCategory,
-  useDeleteTemplate,
   useUpdateCategory,
   useUpdateSettings,
-  useUpdateTemplate,
 } from '../api/data';
 import { IncomeManager } from '../components/IncomeManager';
 import { parseAmount } from '../components/QuickAdd';
@@ -70,10 +67,6 @@ export function Settings() {
 
       <Section title="Categories & budgets">
         <CategoryManager categories={data.categories} />
-      </Section>
-
-      <Section title="Recurring expense templates">
-        <TemplateManager templates={data.templates} categories={data.categories} />
       </Section>
 
       <Section title="Security">
@@ -246,132 +239,6 @@ function SecurityForm({ enabled }: { enabled: boolean }) {
             ? 'Sessions use httpOnly cookies; changing or disabling the password signs out every device. Stored as a salted hash, never in backups. Use the lock icon (top bar / sidebar) to lock without disabling.'
             : 'Optional — when enabled, a login screen protects the app and all API data (min 4 characters).'}
       </span>
-    </form>
-  );
-}
-
-function TemplateManager({ templates, categories }: { templates: ExpenseTemplate[]; categories: Category[] }) {
-  const del = useDeleteTemplate();
-  const toast = useToast();
-  const [editor, setEditor] = useState<{ open: boolean; tpl: ExpenseTemplate | null }>({ open: false, tpl: null });
-  const catName = new Map(categories.map((c) => [c.id, c.name]));
-
-  return (
-    <div>
-      {templates.length === 0 && (
-        <span className="hint">
-          Templates pre-fill the quick-add form from a dropdown — handy for routine expenses.
-        </span>
-      )}
-      {templates.map((t) => (
-        <div key={t.id} className="settings-row">
-          <span className="settings-row__name" style={{ fontSize: 'var(--text-sm)', fontWeight: 500 }}>
-            {t.name}
-            <span className="hint" style={{ display: 'block' }}>
-              {fmtEUR(t.amount)} · {t.categoryId ? catName.get(t.categoryId) ?? '—' : 'no category'}
-              {t.defaultDay ? ` · day ${t.defaultDay}` : ''}
-            </span>
-          </span>
-          <button className="icon-btn" onClick={() => setEditor({ open: true, tpl: t })} aria-label={`Edit ${t.name}`}>
-            <Icon name="pencil" size={15} />
-          </button>
-          <button
-            className="icon-btn"
-            aria-label={`Delete ${t.name}`}
-            onClick={() => { del.mutate(t.id); toast.show('Template deleted'); }}
-          >
-            <Icon name="trash" size={15} />
-          </button>
-        </div>
-      ))}
-      <button className="btn btn--ghost btn--sm" style={{ marginTop: 12 }} onClick={() => setEditor({ open: true, tpl: null })}>
-        <Icon name="plus" size={14} />
-        New template
-      </button>
-      <Sheet
-        open={editor.open}
-        onClose={() => setEditor((e) => ({ ...e, open: false }))}
-        title={editor.tpl ? 'Edit template' : 'New template'}
-      >
-        {editor.open && (
-          <TemplateForm tpl={editor.tpl} categories={categories} onDone={() => setEditor((e) => ({ ...e, open: false }))} />
-        )}
-      </Sheet>
-    </div>
-  );
-}
-
-function TemplateForm({ tpl, categories, onDone }: { tpl: ExpenseTemplate | null; categories: Category[]; onDone: () => void }) {
-  const add = useAddTemplate();
-  const update = useUpdateTemplate();
-  const toast = useToast();
-  const [name, setName] = useState(tpl?.name ?? '');
-  const [amount, setAmount] = useState(tpl ? String(tpl.amount).replace('.', ',') : '');
-  const [categoryId, setCategoryId] = useState(tpl?.categoryId ?? '');
-  const [description, setDescription] = useState(tpl?.description ?? '');
-  const [freq, setFreq] = useState<BillingFrequency>(tpl?.frequency ?? 'monthly');
-  const [day, setDay] = useState(tpl?.defaultDay ? String(tpl.defaultDay) : '');
-
-  const amountN = parseAmount(amount);
-  const valid = name.trim().length > 0 && amountN !== null;
-
-  const submit = () => {
-    if (!valid) return;
-    const dayN = day.trim() === '' ? null : Math.min(31, Math.max(1, Math.round(Number(day) || 1)));
-    const payload = {
-      name: name.trim(), amount: amountN!, categoryId: categoryId || null,
-      description: description.trim(), frequency: freq, defaultDay: dayN,
-    };
-    if (tpl) update.mutate({ ...payload, id: tpl.id });
-    else add.mutate(payload);
-    toast.show(tpl ? 'Template updated' : 'Template added');
-    onDone();
-  };
-
-  return (
-    <form className="qa-form" onSubmit={(e) => { e.preventDefault(); submit(); }}>
-      <div className="qa-row">
-        <div className="field">
-          <label className="label" htmlFor="tpl-name">Name</label>
-          <input id="tpl-name" className="input" placeholder="e.g. Fuel" value={name} onChange={(e) => setName(e.target.value)} />
-        </div>
-        <div className="field">
-          <label className="label" htmlFor="tpl-amount">Amount</label>
-          <input id="tpl-amount" className="input" inputMode="decimal" placeholder="€ 60,00" value={amount} onChange={(e) => setAmount(e.target.value)} />
-        </div>
-      </div>
-      <div className="qa-row">
-        <div className="field">
-          <label className="label" htmlFor="tpl-cat">Category</label>
-          <select id="tpl-cat" className="input" value={categoryId} onChange={(e) => setCategoryId(e.target.value)}>
-            <option value="">No category</option>
-            {categories.map((c) => (
-              <option key={c.id} value={c.id}>{c.name}</option>
-            ))}
-          </select>
-        </div>
-        <div className="field">
-          <label className="label" htmlFor="tpl-day">Default day (optional)</label>
-          <input id="tpl-day" className="input" type="number" min={1} max={31} placeholder="e.g. 15" value={day} onChange={(e) => setDay(e.target.value)} />
-        </div>
-      </div>
-      <div className="qa-row">
-        <div className="field">
-          <label className="label" htmlFor="tpl-desc">Description</label>
-          <input id="tpl-desc" className="input" placeholder="Optional" value={description} onChange={(e) => setDescription(e.target.value)} />
-        </div>
-        <div className="field">
-          <label className="label" htmlFor="tpl-freq">Frequency</label>
-          <select id="tpl-freq" className="input" value={freq} onChange={(e) => setFreq(e.target.value as BillingFrequency)}>
-            <option value="monthly">Monthly</option>
-            <option value="quarterly">Quarterly</option>
-            <option value="yearly">Yearly</option>
-          </select>
-        </div>
-      </div>
-      <button type="submit" className="btn btn--primary" disabled={!valid}>
-        {tpl ? 'Save changes' : 'Add template'}
-      </button>
     </form>
   );
 }
@@ -560,12 +427,11 @@ function ReassignDialog({
   const others = categories.filter((c) => c.id !== category?.id);
   const [target, setTarget] = useState('');
 
-  // the server blocks deletion while ANY of these reference the category
+  // the server blocks deletion while transactions or bills reference the category
   const inUse =
     category && data
       ? data.transactions.filter((t) => t.categoryId === category.id).length +
-        data.subscriptions.filter((s) => s.categoryId === category.id).length +
-        data.templates.filter((t) => t.categoryId === category.id).length
+        data.bills.filter((b) => b.categoryId === category.id).length
       : 0;
 
   return (
@@ -574,7 +440,7 @@ function ReassignDialog({
         {inUse > 0 ? (
           <>
             <p style={{ color: 'var(--muted)', fontSize: 'var(--text-sm)' }}>
-              {inUse} item{inUse === 1 ? '' : 's'} (transactions, subscriptions or templates) use
+              {inUse} item{inUse === 1 ? '' : 's'} (transactions or bills) use
               this category. Pick a category to move them to.
             </p>
             <select

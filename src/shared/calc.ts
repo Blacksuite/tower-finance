@@ -2,7 +2,6 @@
 // raw rows; every division is guarded so empty months can never produce NaN.
 import { billExpensesForCycle } from './bills';
 import { cycleKeyOf, type CycleSettings } from './cycles';
-import { subExpensesForCycle } from './recurring';
 import type {
   AppData,
   Category,
@@ -122,10 +121,9 @@ export function planExpensesForMonth(data: AppData, month: string): number {
 
 export interface Summary {
   income: number;
-  expenses: number; // transaction expenses + plan payments + subscriptions + bills
+  expenses: number; // transaction expenses + plan payments + bills
   transactionExpenses: number;
   planExpenses: number;
-  subscriptionExpenses: number;
   billExpenses: number;
   saved: number;
   invested: number;
@@ -151,14 +149,12 @@ export function summarize(data: AppData, months: string[], bucket?: CycleSetting
   const set = new Set(months);
   const t = sumByType(data.transactions, set, s);
   let planExpenses = 0;
-  let subscriptionExpenses = 0;
   let billExpenses = 0;
   for (const m of months) {
     planExpenses += planExpensesForMonth(data, m);
-    subscriptionExpenses += subExpensesForCycle(data.subscriptions, m, s).total;
     billExpenses += billExpensesForCycle(data.bills, data.billPayments, m, s).total;
   }
-  const expenses = round2(t.expense + planExpenses + subscriptionExpenses + billExpenses);
+  const expenses = round2(t.expense + planExpenses + billExpenses);
   const income = round2(t.income);
   const saved = round2(t.saving);
   const invested = round2(t.investment);
@@ -167,7 +163,6 @@ export function summarize(data: AppData, months: string[], bucket?: CycleSetting
     expenses,
     transactionExpenses: round2(t.expense),
     planExpenses: round2(planExpenses),
-    subscriptionExpenses: round2(subscriptionExpenses),
     billExpenses: round2(billExpenses),
     saved,
     invested,
@@ -183,7 +178,7 @@ export const monthlySummary = (data: AppData, month: string, bucket?: CycleSetti
 // Months with data / active months
 // ---------------------------------------------------------------------------
 
-/** Every cycle that has any data (transactions, plan payments, subscriptions), ascending. */
+/** Every cycle that has any data (transactions, plan payments, bills), ascending. */
 export function monthsWithData(data: AppData, currentMonth: string, bucket?: CycleSettings): string[] {
   const s = bucket ?? data.settings;
   const set = new Set<string>();
@@ -191,17 +186,8 @@ export function monthsWithData(data: AppData, currentMonth: string, bucket?: Cyc
   for (const st of planStates(data, currentMonth)) {
     for (const r of st.rows) if (r.counted > EPS) set.add(r.month);
   }
-  for (const sub of data.subscriptions) {
-    // subscriptions never extend the axis into the future beyond now
-    let label = keyOf(sub.firstBillDate, s);
-    const stop = sub.endsOn ? keyOf(sub.endsOn, s) : currentMonth;
-    for (let i = 0; label <= stop && label <= currentMonth && i < MAX_SCHEDULE_MONTHS; i++) {
-      if (subExpensesForCycle([sub], label, s).total > EPS) set.add(label);
-      label = addMonths(label, 1);
-    }
-  }
   for (const bill of data.bills) {
-    // bills, like subscriptions, never extend the axis past the current cycle
+    // bills never extend the axis past the current cycle
     let label = keyOf(bill.anchorDate, s);
     const stop = bill.endsOn ? keyOf(bill.endsOn, s) : currentMonth;
     for (let i = 0; label <= stop && label <= currentMonth && i < MAX_SCHEDULE_MONTHS; i++) {
@@ -256,9 +242,6 @@ function categoryActuals(data: AppData, months: Set<string>, bucket?: CycleSetti
     map.set(key, (map.get(key) ?? 0) + tx.amount);
   }
   for (const m of months) {
-    for (const [key, amount] of subExpensesForCycle(data.subscriptions, m, s).byCategory) {
-      map.set(key, (map.get(key) ?? 0) + amount);
-    }
     for (const [key, amount] of billExpensesForCycle(data.bills, data.billPayments, m, s).byCategory) {
       map.set(key, (map.get(key) ?? 0) + amount);
     }

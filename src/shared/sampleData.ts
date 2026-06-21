@@ -116,11 +116,9 @@ export function buildSampleData(today: string = todayISO()): ImportPayload {
     bill('bill-rent', 'Rent', 1150, cat('Housing'), 'monthly', m1, false),
     bill('bill-utils', 'Energy & water', 95, cat('Utilities'), 'monthly', `${histMonth}-05`, true),
     bill('bill-ins', 'Health insurance', 140, cat('Insurance'), 'monthly', m1, false),
-  ];
-
-  const subscriptions = [
-    sub('sub-netflix', 'Netflix', 13.99, cat('Subscriptions'), `${histMonth}-12`),
-    sub('sub-spotify', 'Spotify', 10.99, cat('Subscriptions'), `${histMonth}-18`),
+    // fixed-amount subscriptions are just monthly bills now
+    bill('bill-netflix', 'Netflix', 13.99, cat('Subscriptions'), 'monthly', `${histMonth}-12`, false),
+    bill('bill-spotify', 'Spotify', 10.99, cat('Subscriptions'), 'monthly', `${histMonth}-18`, false),
   ];
 
   const plans = [
@@ -133,8 +131,6 @@ export function buildSampleData(today: string = todayISO()): ImportPayload {
     settings: SETTINGS,
     plans,
     planPayments: [],
-    subscriptions,
-    templates: [],
     incomes,
     bills,
     billPayments: [],
@@ -165,19 +161,6 @@ function bill(
   };
 }
 
-function sub(id: string, name: string, amount: number, categoryId: string, firstBillDate: string) {
-  return {
-    id,
-    name,
-    amount,
-    categoryId,
-    description: '',
-    firstBillDate,
-    frequency: 'monthly' as const,
-    endsOn: null,
-  };
-}
-
 /** A fresh dataset — "Clear all data & start fresh": default categories (no
  *  budgets), default settings, nothing else. Mirrors a brand-new install. */
 export function buildEmptyData(): ImportPayload {
@@ -187,8 +170,6 @@ export function buildEmptyData(): ImportPayload {
     settings: { ...DEFAULT_SETTINGS },
     plans: [],
     planPayments: [],
-    subscriptions: [],
-    templates: [],
     incomes: [],
     bills: [],
     billPayments: [],

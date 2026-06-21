@@ -11,11 +11,9 @@ import type {
   AppData,
   Bill,
   Category,
-  ExpenseTemplate,
   PaymentPlan,
   RecurringIncome,
   Settings,
-  Subscription,
   Transaction,
 } from '../../shared/types';
 import { useToast } from '../components/ui/Toast';
@@ -152,56 +150,8 @@ export function useDeleteCategory() {
       ...data,
       categories: data.categories.filter((x) => x.id !== v.id),
       transactions: remap(data.transactions, v.id, v.reassignTo),
-      subscriptions: remap(data.subscriptions, v.id, v.reassignTo),
-      templates: remap(data.templates, v.id, v.reassignTo),
       bills: remap(data.bills, v.id, v.reassignTo),
     }),
-  );
-}
-
-export type SubscriptionInput = Omit<Subscription, 'id'>;
-
-export function useAddSubscription() {
-  return useOptimistic(
-    (s: SubscriptionInput) => api<Subscription>('POST', '/subscriptions', s),
-    (data, s) => ({ ...data, subscriptions: [...data.subscriptions, { ...s, id: tempId() }] }),
-  );
-}
-
-export function useUpdateSubscription() {
-  return useOptimistic(
-    (s: Subscription) => api<Subscription>('PUT', `/subscriptions/${s.id}`, stripId(s)),
-    (data, s) => ({ ...data, subscriptions: data.subscriptions.map((x) => (x.id === s.id ? s : x)) }),
-  );
-}
-
-export function useDeleteSubscription() {
-  return useOptimistic(
-    (id: string) => api('DELETE', `/subscriptions/${id}`),
-    (data, id) => ({ ...data, subscriptions: data.subscriptions.filter((x) => x.id !== id) }),
-  );
-}
-
-export type TemplateInput = Omit<ExpenseTemplate, 'id'>;
-
-export function useAddTemplate() {
-  return useOptimistic(
-    (t: TemplateInput) => api<ExpenseTemplate>('POST', '/templates', t),
-    (data, t) => ({ ...data, templates: [...data.templates, { ...t, id: tempId() }] }),
-  );
-}
-
-export function useUpdateTemplate() {
-  return useOptimistic(
-    (t: ExpenseTemplate) => api<ExpenseTemplate>('PUT', `/templates/${t.id}`, stripId(t)),
-    (data, t) => ({ ...data, templates: data.templates.map((x) => (x.id === t.id ? t : x)) }),
-  );
-}
-
-export function useDeleteTemplate() {
-  return useOptimistic(
-    (id: string) => api('DELETE', `/templates/${id}`),
-    (data, id) => ({ ...data, templates: data.templates.filter((x) => x.id !== id) }),
   );
 }
 

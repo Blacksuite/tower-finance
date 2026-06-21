@@ -1,53 +1,36 @@
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import {
-  planAggregate,
-  rangeMonths,
-  summarize,
-  type DashboardRange,
-} from '../../shared/calc';
+import { planAggregate, summarize } from '../../shared/calc';
 import { billMonthlyCost } from '../../shared/bills';
 import { cycleBounds } from '../../shared/cycles';
-import { monthlyCost } from '../../shared/recurring';
 import { fmtDate, fmtEUR, todayISO } from '../../shared/format';
 import { useAppData, useCurrentCycle } from '../api/data';
 import { Ribbon } from '../components/Ribbon';
 import { UpcomingCard } from '../components/UpcomingCard';
-import { CardSkeleton, Segmented } from '../components/ui/primitives';
-
-const rangeOptions = (cyclic: boolean): { value: DashboardRange; label: string }[] => [
-  { value: 'month', label: cyclic ? 'This cycle' : 'This month' },
-  { value: 'ytd', label: 'YTD' },
-  { value: 'all', label: 'All time' },
-];
+import { Icon } from '../components/ui/Icon';
+import { CardSkeleton } from '../components/ui/primitives';
 
 export function Dashboard() {
   const { data, isLoading } = useAppData();
   const navigate = useNavigate();
-  const [range, setRange] = useState<DashboardRange>('month');
   const currentMonth = useCurrentCycle();
 
+  // The dashboard is always "this cycle" — one screen, one timeframe. Other
+  // ranges (YTD / all-time) live on Insights and Months.
   const derived = useMemo(() => {
     if (!data) return null;
-    const months = rangeMonths(data, range, currentMonth);
-    const summary = summarize(data, months);
+    const summary = summarize(data, [currentMonth]);
     const today = todayISO();
-    const activeSubs = data.subscriptions.filter((s) => !s.endsOn || s.endsOn >= today);
     const activeBills = data.bills.filter((b) => !b.endsOn || b.endsOn >= today);
-    const periodText =
-      months.length > 0
-        ? `${fmtDate(cycleBounds(months[0], data.settings).start)} – ${fmtDate(cycleBounds(months[months.length - 1], data.settings).end)}`
-        : undefined;
+    const bounds = cycleBounds(currentMonth, data.settings);
     return {
       summary,
-      periodText,
+      cycleText: `${fmtDate(bounds.start)} – ${fmtDate(bounds.end)}`,
       plansAgg: planAggregate(data, currentMonth),
-      subsMonthly: activeSubs.reduce((a, s) => a + monthlyCost(s), 0),
-      subsCount: activeSubs.length,
       billsMonthly: activeBills.reduce((a, b) => a + billMonthlyCost(b), 0),
       billsCount: activeBills.length,
     };
-  }, [data, range, currentMonth]);
+  }, [data, currentMonth]);
 
   if (isLoading || !derived) {
     return (
@@ -58,24 +41,22 @@ export function Dashboard() {
     );
   }
 
-  const { summary, periodText, plansAgg, subsMonthly, subsCount, billsMonthly, billsCount } = derived;
-  const cyclic = (data?.settings.salaryDay ?? 1) !== 1;
+  const { summary, cycleText, plansAgg, billsMonthly, billsCount } = derived;
 
   return (
     <div className="stack">
       <div className="screen-head">
         <h1 className="screen-title">Dashboard</h1>
-        <Segmented
-          value={range}
-          onChange={setRange}
-          options={rangeOptions(cyclic)}
-          ariaLabel="Dashboard range"
-        />
+        {/* tap the cycle date range to browse past cycles (Months) */}
+        <button type="button" className="cycle-link" onClick={() => navigate('/months')}>
+          {cycleText}
+          <Icon name="chevronRight" size={15} />
+        </button>
       </div>
 
       {data && <UpcomingCard data={data} />}
 
-      <Ribbon summary={summary} periodText={periodText} />
+      <Ribbon summary={summary} periodText={cycleText} />
 
       <div className="stat-grid">
         <CommitmentCard
@@ -87,11 +68,6 @@ export function Dashboard() {
           label={`Bills${billsCount ? ` · ${billsCount}` : ''}`}
           value={billsMonthly > 0 ? `${fmtEUR(billsMonthly)}/mo` : '—'}
           onClick={() => navigate('/bills')}
-        />
-        <CommitmentCard
-          label={`Subscriptions${subsCount ? ` · ${subsCount}` : ''}`}
-          value={subsMonthly > 0 ? `${fmtEUR(subsMonthly)}/mo` : '—'}
-          onClick={() => navigate('/subscriptions')}
         />
       </div>
     </div>

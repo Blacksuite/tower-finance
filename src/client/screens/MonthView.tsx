@@ -78,8 +78,8 @@ export function MonthView() {
     const summary = monthlySummary(data, month, bucket);
     const bounds = cycleBounds(month, bucket);
     const txs = data.transactions.filter((t) => keyOf(t.date, bucket) === month);
-    // subscriptions & bills as read-only rows in the expense column (plans keep
-    // their own interactive section below, so they're excluded here)
+    // bills as read-only rows in the expense column (plans keep their own
+    // interactive section below, so they're excluded here)
     const virtualExpenses = virtualExpensesBetween(data, bounds.start, bounds.end, currentMonth)
       .filter((v) => v.source.kind !== 'plan');
     const byType = TYPE_ORDER.map((type) => {
@@ -229,14 +229,14 @@ export function MonthView() {
               <Section title="Budget vs actual">
                 <BudgetBars
                   rows={budget}
-                  onSelect={(id) => navigate(`/history?type=expense&categoryId=${encodeURIComponent(id)}`)}
+                  onSelect={(id) => navigate(`/transactions?type=expense&categoryId=${encodeURIComponent(id)}`)}
                 />
               </Section>
 
               <Section title="Top spending">
                 <CategoryBars
                   items={top}
-                  onSelect={(id) => navigate(`/history?type=expense&categoryId=${encodeURIComponent(id)}`)}
+                  onSelect={(id) => navigate(`/transactions?type=expense&categoryId=${encodeURIComponent(id)}`)}
                 />
               </Section>
             </div>

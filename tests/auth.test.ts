@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { createApp } from '../src/server/app';
 import { createDb, readAuthHash, type DB } from '../src/server/db';
+import { DEFAULT_SETTINGS, type AppData } from '../src/shared/types';
 
 let db: DB;
 let app: ReturnType<typeof createApp>;
@@ -161,21 +162,7 @@ describe('session-based password protection', () => {
   });
 });
 
-describe('subscriptions & templates API', () => {
-  it('full subscription lifecycle', async () => {
-    const created = await json('POST', '/api/subscriptions', {
-      name: 'Netflix', amount: 15.99, firstBillDate: '2026-01-07', frequency: 'monthly',
-    });
-    expect(created.status).toBe(201);
-    const { id } = (await created.json()) as { id: string };
-    const upd = await json('PUT', `/api/subscriptions/${id}`, {
-      name: 'Netflix 4K', amount: 19.99, firstBillDate: '2026-01-07', frequency: 'monthly', endsOn: '2026-08-01',
-    });
-    expect(upd.status).toBe(200);
-    expect((await json('DELETE', `/api/subscriptions/${id}`)).status).toBe(200);
-    expect((await json('POST', '/api/subscriptions', { name: 'X', amount: 5, firstBillDate: '2026-01-01', frequency: 'weekly' })).status).toBe(400);
-  });
-
+describe('income API & legacy import', () => {
   it('full income lifecycle with validation', async () => {
     const created = await json('POST', '/api/incomes', {
       name: 'Salary', amount: 3000, frequency: 'monthly', anchorDate: '2026-01-26', weekendRule: 'previous',
@@ -206,23 +193,33 @@ describe('subscriptions & templates API', () => {
     expect(boot2.incomes).toEqual([]);
   });
 
-  it('full template lifecycle and export round-trip', async () => {
-    const created = await json('POST', '/api/templates', { name: 'Fuel', amount: 60, defaultDay: 15 });
-    expect(created.status).toBe(201);
-    const { id } = (await created.json()) as { id: string };
-    await json('POST', '/api/subscriptions', { name: 'Gym', amount: 30, firstBillDate: '2026-02-01', frequency: 'monthly' });
-
-    const dump = (await (await json('GET', '/api/export')).json()) as Record<string, unknown>;
-    const db2 = createDb(':memory:');
-    const app2 = createApp(db2);
-    const res = await app2.request('/api/import', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(dump),
-    });
-    expect(res.status).toBe(200);
-    const boot = (await (await app2.request('/api/bootstrap')).json()) as {
-      templates: { id: string }[]; subscriptions: { name: string }[];
+  it('legacy backup: subscriptions migrate into bills, templates are dropped', async () => {
+    // a pre-v1.7 backup shape (still has subscriptions + templates arrays)
+    const legacy = {
+      transactions: [],
+      categories: [{ id: 'c1', name: 'Subs', budget: 0, sortOrder: 0 }],
+      settings: DEFAULT_SETTINGS,
+      plans: [],
+      planPayments: [],
+      subscriptions: [
+        { id: 'sub1', name: 'Netflix', amount: 15.99, categoryId: 'c1', description: '', firstBillDate: '2026-01-07', frequency: 'monthly', endsOn: null },
+      ],
+      templates: [
+        { id: 'tpl1', name: 'Fuel', amount: 60, categoryId: 'c1', description: '', frequency: 'monthly', defaultDay: 15 },
+      ],
+      incomes: [],
+      bills: [],
+      billPayments: [],
     };
-    expect(boot.templates[0].id).toBe(id);
-    expect(boot.subscriptions[0].name).toBe('Gym');
+    expect((await json('POST', '/api/import', legacy)).status).toBe(200);
+    const boot = (await (await json('GET', '/api/bootstrap')).json()) as AppData & Record<string, unknown>;
+    // the subscription became a fixed-amount monthly bill…
+    expect(boot.bills).toHaveLength(1);
+    expect(boot.bills[0]).toMatchObject({
+      name: 'Netflix', amount: 15.99, frequency: 'monthly', anchorDate: '2026-01-07', estimated: false,
+    });
+    // …and both defunct entities are gone from the model
+    expect('subscriptions' in boot).toBe(false);
+    expect('templates' in boot).toBe(false);
   });
 });

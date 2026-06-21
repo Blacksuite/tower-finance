@@ -1,6 +1,7 @@
+import Database from 'better-sqlite3';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { createApp } from '../src/server/app';
-import { createDb, readAll, SEED_CATEGORIES, type DB } from '../src/server/db';
+import { createDb, migrate, readAll, SEED_CATEGORIES, type DB } from '../src/server/db';
 import { DEFAULT_SETTINGS, type AppData } from '../src/shared/types';
 
 let db: DB;
@@ -25,6 +26,49 @@ describe('bootstrap & seeding', () => {
     const data = (await res.json()) as AppData;
     expect(data.categories.map((c) => c.name)).toEqual(SEED_CATEGORIES);
     expect(data.settings).toEqual(DEFAULT_SETTINGS);
+  });
+});
+
+describe('schema migration (v1 — subs → bills)', () => {
+  it('migrates an old subscriptions table into bills and drops both legacy tables', () => {
+    const raw = new Database(':memory:');
+    raw.exec(`
+      CREATE TABLE bills (
+        id TEXT PRIMARY KEY, name TEXT NOT NULL, amount REAL NOT NULL,
+        category_id TEXT, description TEXT NOT NULL DEFAULT '',
+        frequency TEXT NOT NULL, anchor_date TEXT NOT NULL, interval_days INTEGER,
+        weekend_rule TEXT NOT NULL DEFAULT 'exact', ends_on TEXT, estimated INTEGER NOT NULL DEFAULT 0
+      );
+      CREATE TABLE subscriptions (
+        id TEXT PRIMARY KEY, name TEXT NOT NULL, amount REAL NOT NULL, category_id TEXT,
+        description TEXT NOT NULL DEFAULT '', first_bill_date TEXT NOT NULL, frequency TEXT NOT NULL, ends_on TEXT
+      );
+      CREATE TABLE templates (id TEXT PRIMARY KEY, name TEXT NOT NULL, amount REAL NOT NULL);
+      INSERT INTO subscriptions (id, name, amount, category_id, description, first_bill_date, frequency, ends_on)
+        VALUES ('s1', 'Netflix', 15.99, NULL, '', '2026-01-07', 'monthly', NULL);
+      INSERT INTO templates (id, name, amount) VALUES ('t1', 'Fuel', 60);
+    `);
+    raw.pragma('user_version = 0'); // pre-migration DB
+
+    migrate(raw);
+
+    const bills = raw.prepare('SELECT * FROM bills').all() as Array<Record<string, unknown>>;
+    expect(bills).toHaveLength(1);
+    expect(bills[0]).toMatchObject({
+      id: 's1', name: 'Netflix', amount: 15.99, anchor_date: '2026-01-07', weekend_rule: 'exact', estimated: 0,
+    });
+    const tables = (raw.prepare("SELECT name FROM sqlite_master WHERE type='table'").all() as { name: string }[]).map((t) => t.name);
+    expect(tables).not.toContain('subscriptions');
+    expect(tables).not.toContain('templates');
+    expect(raw.pragma('user_version', { simple: true })).toBe(1);
+    raw.close();
+  });
+
+  it('is a no-op (and re-runnable) on a fresh install', () => {
+    const fresh = createDb(':memory:'); // migrate already ran at creation
+    expect(() => migrate(fresh)).not.toThrow();
+    expect(readAll(fresh).bills).toEqual([]);
+    expect(fresh.pragma('user_version', { simple: true })).toBe(1);
   });
 });
 

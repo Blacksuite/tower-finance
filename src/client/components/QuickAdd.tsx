@@ -168,34 +168,6 @@ function QuickAddForm({
     >
       <Segmented value={type} onChange={(t) => setType(t)} options={TYPE_OPTIONS} block ariaLabel="Transaction type" />
 
-      {type === 'expense' && !editing && (data?.templates.length ?? 0) > 0 && (
-        <select
-          className="input"
-          aria-label="Use a recurring expense template"
-          value=""
-          onChange={(e) => {
-            const tpl = data?.templates.find((t) => t.id === e.target.value);
-            if (!tpl) return;
-            setAmountStr(String(tpl.amount).replace('.', ','));
-            setDescription(tpl.description || tpl.name);
-            setCategoryId(tpl.categoryId);
-            if (tpl.defaultDay) {
-              const base = todayISO();
-              const [y, m] = base.split('-').map(Number);
-              const last = new Date(y, m, 0).getDate();
-              setDate(`${base.slice(0, 8)}${String(Math.min(tpl.defaultDay, last)).padStart(2, '0')}`);
-            }
-          }}
-        >
-          <option value="">Use template… (or fill in manually)</option>
-          {data?.templates.map((t) => (
-            <option key={t.id} value={t.id}>
-              {t.name} · {String(t.amount).replace('.', ',')}
-            </option>
-          ))}
-        </select>
-      )}
-
       <input
         ref={amountRef}
         className="qa-amount"

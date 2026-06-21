@@ -8,12 +8,10 @@ import {
   type Bill,
   type BillPayment,
   type Category,
-  type ExpenseTemplate,
   type PaymentPlan,
   type PlanPayment,
   type RecurringIncome,
   type Settings,
-  type Subscription,
   type Transaction,
 } from '../shared/types';
 
@@ -64,29 +62,10 @@ export function createDb(file: string) {
       amount_paid REAL NOT NULL CHECK (amount_paid >= 0),
       PRIMARY KEY (plan_id, month)
     );
-    CREATE TABLE IF NOT EXISTS subscriptions (
-      id TEXT PRIMARY KEY,
-      name TEXT NOT NULL,
-      amount REAL NOT NULL CHECK (amount > 0),
-      category_id TEXT REFERENCES categories(id),
-      description TEXT NOT NULL DEFAULT '',
-      first_bill_date TEXT NOT NULL,
-      frequency TEXT NOT NULL CHECK (frequency IN ('monthly','quarterly','yearly')),
-      ends_on TEXT
-    );
     CREATE TABLE IF NOT EXISTS sessions (
       token_hash TEXT PRIMARY KEY,
       created_at TEXT NOT NULL,
       last_seen TEXT NOT NULL
-    );
-    CREATE TABLE IF NOT EXISTS templates (
-      id TEXT PRIMARY KEY,
-      name TEXT NOT NULL,
-      amount REAL NOT NULL CHECK (amount > 0),
-      category_id TEXT REFERENCES categories(id),
-      description TEXT NOT NULL DEFAULT '',
-      frequency TEXT NOT NULL DEFAULT 'monthly' CHECK (frequency IN ('monthly','quarterly','yearly')),
-      default_day INTEGER
     );
     CREATE TABLE IF NOT EXISTS incomes (
       id TEXT PRIMARY KEY,
@@ -119,6 +98,8 @@ export function createDb(file: string) {
     );
   `);
 
+  migrate(db);
+
   const catCount = (db.prepare('SELECT COUNT(*) n FROM categories').get() as { n: number }).n;
   if (catCount === 0) {
     const ins = db.prepare('INSERT INTO categories (id, name, budget, sort_order) VALUES (?, ?, 0, ?)');
@@ -129,6 +110,41 @@ export function createDb(file: string) {
   }
 
   return db;
+}
+
+// --- schema migrations -----------------------------------------------------
+// CREATE TABLE IF NOT EXISTS handles additive changes, but column adds/renames
+// and data reshapes need an explicit ladder. PRAGMA user_version tracks how far
+// a DB has been migrated. Self-hosters skip versions, so each step must be safe
+// to run on any older shape and a no-op on a fresh install.
+const SCHEMA_VERSION = 1;
+
+function tableExists(db: Database.Database, name: string): boolean {
+  return !!db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?").get(name);
+}
+
+export function migrate(db: Database.Database) {
+  let version = db.pragma('user_version', { simple: true }) as number;
+
+  // v1: merge subscriptions into bills (a fixed-amount subscription is just a
+  // monthly/quarterly/yearly bill) and drop the now-defunct templates entity.
+  if (version < 1) {
+    if (tableExists(db, 'subscriptions')) {
+      db.exec(`
+        INSERT INTO bills
+          (id, name, amount, category_id, description, frequency, anchor_date,
+           interval_days, weekend_rule, ends_on, estimated)
+        SELECT id, name, amount, category_id, description, frequency, first_bill_date,
+               NULL, 'exact', ends_on, 0
+        FROM subscriptions;
+        DROP TABLE subscriptions;
+      `);
+    }
+    db.exec('DROP TABLE IF EXISTS templates;');
+    version = 1;
+  }
+
+  db.pragma(`user_version = ${SCHEMA_VERSION}`);
 }
 
 // --- row mapping -----------------------------------------------------------
@@ -154,25 +170,6 @@ const toPlan = (r: PlanRow): PaymentPlan => ({
 });
 const toPay = (r: PayRow): PlanPayment => ({
   planId: r.plan_id, month: r.month, amountPaid: r.amount_paid,
-});
-
-type SubRow = {
-  id: string; name: string; amount: number; category_id: string | null;
-  description: string; first_bill_date: string; frequency: Subscription['frequency']; ends_on: string | null;
-};
-type TemplateRow = {
-  id: string; name: string; amount: number; category_id: string | null;
-  description: string; frequency: ExpenseTemplate['frequency']; default_day: number | null;
-};
-
-const toSub = (r: SubRow): Subscription => ({
-  id: r.id, name: r.name, amount: r.amount, categoryId: r.category_id,
-  description: r.description, firstBillDate: r.first_bill_date,
-  frequency: r.frequency, endsOn: r.ends_on,
-});
-const toTemplate = (r: TemplateRow): ExpenseTemplate => ({
-  id: r.id, name: r.name, amount: r.amount, categoryId: r.category_id,
-  description: r.description, frequency: r.frequency, defaultDay: r.default_day,
 });
 
 type IncomeRow = {
@@ -274,8 +271,6 @@ export function readAll(db: DB): AppData {
     settings: readSettings(db),
     plans: (db.prepare('SELECT * FROM plans ORDER BY start_month').all() as PlanRow[]).map(toPlan),
     planPayments: (db.prepare('SELECT * FROM plan_payments ORDER BY month').all() as PayRow[]).map(toPay),
-    subscriptions: (db.prepare('SELECT * FROM subscriptions ORDER BY name').all() as SubRow[]).map(toSub),
-    templates: (db.prepare('SELECT * FROM templates ORDER BY name').all() as TemplateRow[]).map(toTemplate),
     incomes: (db.prepare('SELECT * FROM incomes ORDER BY name').all() as IncomeRow[]).map(toIncome),
     bills: (db.prepare('SELECT * FROM bills ORDER BY name').all() as BillRow[]).map(toBill),
     billPayments: (db.prepare('SELECT * FROM bill_payments ORDER BY date').all() as BillPaymentRow[]).map(toBillPayment),
@@ -291,8 +286,6 @@ export function replaceAll(db: DB, data: Omit<AppData, 'auth'>) {
     db.prepare('DELETE FROM plans').run();
     db.prepare('DELETE FROM bill_payments').run();
     db.prepare('DELETE FROM bills').run();
-    db.prepare('DELETE FROM subscriptions').run();
-    db.prepare('DELETE FROM templates').run();
     db.prepare('DELETE FROM incomes').run();
     db.prepare('DELETE FROM transactions').run();
     db.prepare('DELETE FROM categories').run();
@@ -310,12 +303,6 @@ export function replaceAll(db: DB, data: Omit<AppData, 'auth'>) {
 
     const insPay = db.prepare('INSERT INTO plan_payments (plan_id, month, amount_paid) VALUES (?, ?, ?)');
     for (const p of data.planPayments) insPay.run(p.planId, p.month, p.amountPaid);
-
-    const insSub = db.prepare('INSERT INTO subscriptions (id, name, amount, category_id, description, first_bill_date, frequency, ends_on) VALUES (?, ?, ?, ?, ?, ?, ?, ?)');
-    for (const s of data.subscriptions) insSub.run(s.id, s.name, s.amount, s.categoryId, s.description, s.firstBillDate, s.frequency, s.endsOn);
-
-    const insTpl = db.prepare('INSERT INTO templates (id, name, amount, category_id, description, frequency, default_day) VALUES (?, ?, ?, ?, ?, ?, ?)');
-    for (const t of data.templates) insTpl.run(t.id, t.name, t.amount, t.categoryId, t.description, t.frequency, t.defaultDay);
 
     const insInc = db.prepare('INSERT INTO incomes (id, name, amount, frequency, anchor_date, interval_days, weekend_rule, ends_on) VALUES (?, ?, ?, ?, ?, ?, ?, ?)');
     for (const i of data.incomes) insInc.run(i.id, i.name, i.amount, i.frequency, i.anchorDate, i.intervalDays, i.weekendRule, i.endsOn);

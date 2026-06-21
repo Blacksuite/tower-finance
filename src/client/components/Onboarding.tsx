@@ -21,17 +21,13 @@ export function isFreshInstall(d: {
   transactions: unknown[];
   incomes: unknown[];
   bills: unknown[];
-  subscriptions: unknown[];
   plans: unknown[];
-  templates: unknown[];
 }): boolean {
   return (
     d.transactions.length === 0 &&
     d.incomes.length === 0 &&
     d.bills.length === 0 &&
-    d.subscriptions.length === 0 &&
-    d.plans.length === 0 &&
-    d.templates.length === 0
+    d.plans.length === 0
   );
 }
 

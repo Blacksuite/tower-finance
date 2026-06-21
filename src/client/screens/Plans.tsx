@@ -3,7 +3,7 @@ import { planStates } from '../../shared/calc';
 import { currentMonthISO } from '../../shared/format';
 import type { PaymentPlan } from '../../shared/types';
 import { useAddPlan, useAppData, useCurrentCycle, useDeletePlan, useUpdatePlan } from '../api/data';
-import { RecurringSwitcher } from './Subscriptions';
+import { RecurringSwitcher } from './Bills';
 import { PlanCard } from '../components/PlanCard';
 import { parseAmount } from '../components/QuickAdd';
 import { Icon } from '../components/ui/Icon';

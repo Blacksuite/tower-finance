@@ -12,16 +12,17 @@ const NAV: { to: string; label: string; icon: IconName }[] = [
   { to: '/insights', label: 'Insights', icon: 'trend' },
   { to: '/plans', label: 'Plans', icon: 'layers' },
   { to: '/bills', label: 'Bills', icon: 'wallet' },
-  { to: '/subscriptions', label: 'Subscriptions', icon: 'repeat' },
-  { to: '/history', label: 'History', icon: 'filter' },
+  { to: '/transactions', label: 'Transactions', icon: 'filter' },
   { to: '/settings', label: 'Settings', icon: 'gear' },
 ];
 
 // Mobile tab bar: four destinations symmetric around the centered FAB
-// (2 + FAB + 2). Settings lives in the top bar (gear); Bills & Subscriptions
-// live in the labeled Plans ⇄ Bills ⇄ Subscriptions switcher under the Plans
-// tab; History is reached via click-through from summaries and the Months page.
-const TABS = [NAV[0], NAV[1], NAV[2], NAV[3]];
+// (2 + FAB + 2) — Dashboard, Transactions, Insights, Plans. Settings lives in
+// the top bar (gear); Bills lives in the labeled Plans ⇄ Bills switcher under
+// the Plans tab; Months is reached by tapping the cycle date range on the
+// Dashboard.
+const byPath = (p: string) => NAV.find((n) => n.to === p)!;
+const TABS = [byPath('/'), byPath('/transactions'), byPath('/insights'), byPath('/plans')];
 
 function BrandMark() {
   return (
@@ -88,15 +89,6 @@ export function Layout() {
           Tower
         </span>
         <span className="topbar__actions">
-          {/* History lives here on mobile (not on the tab bar): a global utility
-              action like lock/settings, same 'filter' icon as the desktop sidebar. */}
-          <NavLink
-            to="/history"
-            className={({ isActive }) => `icon-btn${isActive ? ' is-active' : ''}`}
-            aria-label="History"
-          >
-            <Icon name="filter" size={18} />
-          </NavLink>
           {authEnabled && (
             <button className="icon-btn" onClick={lock} aria-label="Lock app">
               <Icon name="lock" size={18} />

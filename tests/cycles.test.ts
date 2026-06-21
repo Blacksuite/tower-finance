@@ -12,8 +12,7 @@ import {
   planAggregate,
   budgetVsActualMonth,
 } from '../src/shared/calc';
-import { monthlyCost, nextBillDate, occurrencesBetween, subOccurrencesForCycle } from '../src/shared/recurring';
-import { DEFAULT_SETTINGS, type AppData, type Settings, type Subscription, type Transaction } from '../src/shared/types';
+import { DEFAULT_SETTINGS, type AppData, type Bill, type Settings, type Transaction } from '../src/shared/types';
 
 const cs = (salaryDay: number, weekendRule: CycleSettings['weekendRule'] = 'exact'): CycleSettings => ({
   salaryDay,
@@ -29,14 +28,15 @@ const data = (
   over: Partial<Omit<AppData, 'settings'>> & { settings?: Partial<Settings> } = {},
 ): AppData => ({
   transactions: [], categories: [], plans: [], planPayments: [],
-  subscriptions: [], templates: [], incomes: [], bills: [], billPayments: [], auth: { enabled: false },
+  incomes: [], bills: [], billPayments: [], auth: { enabled: false },
   ...over,
   settings: { ...DEFAULT_SETTINGS, ...(over.settings ?? {}) },
 });
 
-const sub = (over: Partial<Subscription> = {}): Subscription => ({
-  id: 's1', name: 'Netflix', amount: 15, categoryId: null, description: '',
-  firstBillDate: '2026-01-07', frequency: 'monthly', endsOn: null, ...over,
+const bill = (over: Partial<Bill> = {}): Bill => ({
+  id: 'b1', name: 'Netflix', amount: 15, categoryId: null, description: '',
+  frequency: 'monthly', anchorDate: '2026-01-07', intervalDays: null,
+  weekendRule: 'exact', endsOn: null, estimated: false, ...over,
 });
 
 describe('salary dates', () => {
@@ -128,44 +128,19 @@ describe('cycle-aware summaries', () => {
   });
 });
 
-describe('subscriptions', () => {
-  it('generates monthly occurrences with day clamping', () => {
-    const s31 = sub({ firstBillDate: '2026-01-31' });
-    expect(occurrencesBetween(s31, '2026-01-01', '2026-04-30')).toEqual([
-      '2026-01-31', '2026-02-28', '2026-03-31', '2026-04-30',
-    ]);
-  });
-
-  it('supports quarterly and yearly frequencies', () => {
-    expect(occurrencesBetween(sub({ frequency: 'quarterly' }), '2026-01-01', '2026-12-31')).toEqual([
-      '2026-01-07', '2026-04-07', '2026-07-07', '2026-10-07',
-    ]);
-    expect(occurrencesBetween(sub({ frequency: 'yearly' }), '2026-01-01', '2028-12-31')).toEqual([
-      '2026-01-07', '2027-01-07', '2028-01-07',
-    ]);
-  });
-
-  it('stops contributing after endsOn but keeps history before it', () => {
-    const ended = sub({ endsOn: '2026-03-15' });
-    expect(occurrencesBetween(ended, '2026-01-01', '2026-12-31')).toEqual([
-      '2026-01-07', '2026-02-07', '2026-03-07',
-    ]);
-    expect(nextBillDate(ended, '2026-06-01')).toBeNull();
-    expect(nextBillDate(sub(), '2026-06-11')).toBe('2026-07-07');
-  });
-
+describe('bills flow into summaries', () => {
+  // Occurrence/cadence mechanics live in bills.test.ts; this asserts the
+  // integration into calc (a fixed-amount bill — formerly a subscription).
   it('flows into expenses and budget actuals automatically', () => {
     const d = data({
       categories: [{ id: 'c1', name: 'Subscriptions', budget: 50, sortOrder: 0 }],
-      subscriptions: [sub({ categoryId: 'c1' })],
+      bills: [bill({ categoryId: 'c1' })],
       transactions: [tx('2026-06-01', 'income', 1000)],
     });
-    expect(monthlySummary(d, '2026-06').subscriptionExpenses).toBe(15);
+    expect(monthlySummary(d, '2026-06').billExpenses).toBe(15);
     expect(monthlySummary(d, '2026-06').expenses).toBe(15);
     const row = budgetVsActualMonth(d, '2026-06').find((r) => r.id === 'c1')!;
     expect(row.actual).toBe(15);
-    expect(subOccurrencesForCycle([sub()], '2026-06', DEFAULT_SETTINGS)).toHaveLength(1);
-    expect(monthlyCost(sub({ frequency: 'yearly', amount: 120 }))).toBe(10);
   });
 });
 

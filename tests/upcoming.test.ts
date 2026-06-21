@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { upcomingView } from '../src/shared/upcoming';
-import { DEFAULT_SETTINGS, type AppData, type Settings, type Transaction } from '../src/shared/types';
+import { DEFAULT_SETTINGS, type AppData, type Bill, type Settings, type Transaction } from '../src/shared/types';
 
 let id = 0;
 const tx = (date: string, type: Transaction['type'], amount: number): Transaction => ({
@@ -11,7 +11,7 @@ const data = (
   over: Partial<Omit<AppData, 'settings'>> & { settings?: Partial<Settings> } = {},
 ): AppData => ({
   transactions: [], categories: [], plans: [], planPayments: [],
-  subscriptions: [], templates: [], incomes: [], bills: [], billPayments: [], auth: { enabled: false },
+  incomes: [], bills: [], billPayments: [], auth: { enabled: false },
   ...over,
   settings: { ...DEFAULT_SETTINGS, ...(over.settings ?? {}) },
 });
@@ -21,9 +21,11 @@ const salary = {
   anchorDate: '2026-05-26', intervalDays: null, weekendRule: 'previous' as const, endsOn: null,
 };
 
-const sub = (name: string, amount: number, firstBillDate: string) => ({
+// a fixed-amount monthly bill (formerly a subscription, post subs→bills merge)
+const sub = (name: string, amount: number, anchorDate: string): Bill => ({
   id: `s-${name}`, name, amount, categoryId: null, description: '',
-  firstBillDate, frequency: 'monthly' as const, endsOn: null,
+  frequency: 'monthly', anchorDate, intervalDays: null, weekendRule: 'exact',
+  endsOn: null, estimated: false,
 });
 
 describe('upcomingView', () => {
@@ -43,7 +45,7 @@ describe('upcomingView', () => {
   it('collects bills strictly between today and payday', () => {
     const d = data({
       incomes: [salary],
-      subscriptions: [
+      bills: [
         sub('Netflix', 15.99, '2026-01-20'), // 20 Jun — inside window
         sub('Gym', 30, '2026-01-13'), // 13 Jun — today, NOT upcoming
         sub('Insurance', 120, '2026-01-26'), // 26 Jun — payday itself, excluded
@@ -64,7 +66,7 @@ describe('upcomingView', () => {
         tx('2026-06-05', 'saving', 300),
         tx('2026-06-30', 'expense', 999), // after today: ignored
       ],
-      subscriptions: [
+      bills: [
         sub('Gym', 30, '2026-01-01'), // charged 1 Jun (past in cycle)
         sub('Netflix', 15.99, '2026-01-20'), // upcoming 20 Jun
       ],

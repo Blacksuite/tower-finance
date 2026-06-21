@@ -615,3 +615,17 @@
 
 .icon-btn:hover { background: var(--surface-2); color: var(--text); }
 .icon-btn.is-active { color: var(--text); background: var(--surface-2); }
+
+/* Dashboard cycle-range link → Months. A quiet, tappable date range. */
+.cycle-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 10px;
+  border-radius: var(--radius-input);
+  color: var(--muted);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  transition: background var(--dur) var(--ease), color var(--dur) var(--ease);
+}
+.cycle-link:hover { background: var(--surface-2); color: var(--text); }

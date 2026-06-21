@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { billMonthlyCost, nextBillOccurrence } from '../../shared/bills';
 import { fmtDate, fmtEUR, todayISO } from '../../shared/format';
 import type { Bill, BillFrequency } from '../../shared/types';
@@ -7,8 +8,25 @@ import { parseAmount } from '../components/QuickAdd';
 import { Icon } from '../components/ui/Icon';
 import { Sheet } from '../components/ui/Sheet';
 import { useToast } from '../components/ui/Toast';
-import { CardSkeleton, EmptyState } from '../components/ui/primitives';
-import { RecurringSwitcher } from './Subscriptions';
+import { CardSkeleton, EmptyState, Segmented } from '../components/ui/primitives';
+
+/** Header switcher shared by the Plans and Bills pages (their mobile reach is
+ *  the labeled Plans ⇄ Bills toggle under the Plans tab). */
+const RECURRING_PATHS = { plans: '/plans', bills: '/bills' } as const;
+export function RecurringSwitcher({ current }: { current: 'plans' | 'bills' }) {
+  const navigate = useNavigate();
+  return (
+    <Segmented
+      value={current}
+      onChange={(v) => navigate(RECURRING_PATHS[v])}
+      options={[
+        { value: 'plans', label: 'Plans' },
+        { value: 'bills', label: 'Bills' },
+      ]}
+      ariaLabel="Recurring section"
+    />
+  );
+}
 
 const FREQ_LABELS: Record<BillFrequency, string> = {
   once: 'One-off',

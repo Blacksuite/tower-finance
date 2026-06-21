@@ -16,7 +16,6 @@ describe('sample data', () => {
     expect(data.transactions.length).toBeGreaterThan(10);
     expect(data.incomes.length).toBe(1);
     expect(data.bills.length).toBeGreaterThan(0);
-    expect(data.subscriptions.length).toBeGreaterThan(0);
     expect(data.plans.length).toBe(1);
   });
 

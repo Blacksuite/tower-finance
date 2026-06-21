@@ -138,25 +138,17 @@ const settingsInput = z.object({
   locale: z.string().min(2).max(20).optional(),
 });
 
-const frequency = z.enum(['monthly', 'quarterly', 'yearly']);
-
-const subscriptionInput = z.object({
+// Legacy subscription shape, kept only so old JSON backups still import: each
+// subscription becomes a fixed-amount monthly/quarterly/yearly bill (see import).
+const legacySubscription = z.object({
+  id: z.string().min(1),
   name: z.string().trim().min(1).max(100),
   amount,
   categoryId: z.string().nullable().default(null),
   description: z.string().trim().max(200).default(''),
   firstBillDate: isoDate,
-  frequency,
+  frequency: z.enum(['monthly', 'quarterly', 'yearly']),
   endsOn: isoDate.nullable().default(null),
-});
-
-const templateInput = z.object({
-  name: z.string().trim().min(1).max(100),
-  amount,
-  categoryId: z.string().nullable().default(null),
-  description: z.string().trim().max(200).default(''),
-  frequency: frequency.default('monthly'),
-  defaultDay: z.number().int().min(1).max(31).nullable().default(null),
 });
 
 const incomeBase = z.object({
@@ -236,8 +228,8 @@ const importInput = z.object({
     month: isoMonth,
     amountPaid: z.number().finite().min(0),
   })),
-  subscriptions: z.array(subscriptionInput.extend({ id: z.string().min(1) })).default([]),
-  templates: z.array(templateInput.extend({ id: z.string().min(1) })).default([]),
+  // legacy: folded into bills on import; templates are dropped (stripped by zod)
+  subscriptions: z.array(legacySubscription).default([]),
   // optional for backups made before recurring income existed
   incomes: z.array(incomeBase.extend({ id: z.string().min(1) })).default([]),
   // optional for backups made before bills existed
@@ -433,79 +425,15 @@ export function createApp(db: DB) {
     const reassignTo = typeof body?.reassignTo === 'string' ? body.reassignTo : null;
     const inUse =
       (db.prepare('SELECT COUNT(*) n FROM transactions WHERE category_id = ?').get(id) as { n: number }).n +
-      (db.prepare('SELECT COUNT(*) n FROM subscriptions WHERE category_id = ?').get(id) as { n: number }).n +
-      (db.prepare('SELECT COUNT(*) n FROM templates WHERE category_id = ?').get(id) as { n: number }).n +
       (db.prepare('SELECT COUNT(*) n FROM bills WHERE category_id = ?').get(id) as { n: number }).n;
     if (inUse > 0) {
       if (!reassignTo || reassignTo === id || !categoryExists(reassignTo)) {
         return c.json({ error: 'category in use: provide a valid reassignTo category' }, 400);
       }
       db.prepare('UPDATE transactions SET category_id = ? WHERE category_id = ?').run(reassignTo, id);
-      db.prepare('UPDATE subscriptions SET category_id = ? WHERE category_id = ?').run(reassignTo, id);
-      db.prepare('UPDATE templates SET category_id = ? WHERE category_id = ?').run(reassignTo, id);
       db.prepare('UPDATE bills SET category_id = ? WHERE category_id = ?').run(reassignTo, id);
     }
     db.prepare('DELETE FROM categories WHERE id = ?').run(id);
-    return c.json({ ok: true });
-  });
-
-  // subscriptions ----------------------------------------------------------------
-  api.post('/subscriptions', async (c) => {
-    const parsed = subscriptionInput.safeParse(await c.req.json().catch(() => null));
-    if (!parsed.success) return c.json({ error: parsed.error.issues[0].message }, 400);
-    const s = parsed.data;
-    if (s.categoryId && !categoryExists(s.categoryId)) return c.json({ error: 'unknown category' }, 400);
-    const id = randomUUID();
-    db.prepare('INSERT INTO subscriptions (id, name, amount, category_id, description, first_bill_date, frequency, ends_on) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
-      .run(id, s.name, s.amount, s.categoryId, s.description, s.firstBillDate, s.frequency, s.endsOn);
-    return c.json({ ...s, id }, 201);
-  });
-
-  api.put('/subscriptions/:id', async (c) => {
-    const id = c.req.param('id');
-    if (!db.prepare('SELECT 1 FROM subscriptions WHERE id = ?').get(id)) return c.json({ error: 'not found' }, 404);
-    const parsed = subscriptionInput.safeParse(await c.req.json().catch(() => null));
-    if (!parsed.success) return c.json({ error: parsed.error.issues[0].message }, 400);
-    const s = parsed.data;
-    if (s.categoryId && !categoryExists(s.categoryId)) return c.json({ error: 'unknown category' }, 400);
-    db.prepare('UPDATE subscriptions SET name = ?, amount = ?, category_id = ?, description = ?, first_bill_date = ?, frequency = ?, ends_on = ? WHERE id = ?')
-      .run(s.name, s.amount, s.categoryId, s.description, s.firstBillDate, s.frequency, s.endsOn, id);
-    return c.json({ ...s, id });
-  });
-
-  api.delete('/subscriptions/:id', (c) => {
-    const res = db.prepare('DELETE FROM subscriptions WHERE id = ?').run(c.req.param('id'));
-    if (res.changes === 0) return c.json({ error: 'not found' }, 404);
-    return c.json({ ok: true });
-  });
-
-  // templates ----------------------------------------------------------------------
-  api.post('/templates', async (c) => {
-    const parsed = templateInput.safeParse(await c.req.json().catch(() => null));
-    if (!parsed.success) return c.json({ error: parsed.error.issues[0].message }, 400);
-    const t = parsed.data;
-    if (t.categoryId && !categoryExists(t.categoryId)) return c.json({ error: 'unknown category' }, 400);
-    const id = randomUUID();
-    db.prepare('INSERT INTO templates (id, name, amount, category_id, description, frequency, default_day) VALUES (?, ?, ?, ?, ?, ?, ?)')
-      .run(id, t.name, t.amount, t.categoryId, t.description, t.frequency, t.defaultDay);
-    return c.json({ ...t, id }, 201);
-  });
-
-  api.put('/templates/:id', async (c) => {
-    const id = c.req.param('id');
-    if (!db.prepare('SELECT 1 FROM templates WHERE id = ?').get(id)) return c.json({ error: 'not found' }, 404);
-    const parsed = templateInput.safeParse(await c.req.json().catch(() => null));
-    if (!parsed.success) return c.json({ error: parsed.error.issues[0].message }, 400);
-    const t = parsed.data;
-    if (t.categoryId && !categoryExists(t.categoryId)) return c.json({ error: 'unknown category' }, 400);
-    db.prepare('UPDATE templates SET name = ?, amount = ?, category_id = ?, description = ?, frequency = ?, default_day = ? WHERE id = ?')
-      .run(t.name, t.amount, t.categoryId, t.description, t.frequency, t.defaultDay, id);
-    return c.json({ ...t, id });
-  });
-
-  api.delete('/templates/:id', (c) => {
-    const res = db.prepare('DELETE FROM templates WHERE id = ?').run(c.req.param('id'));
-    if (res.changes === 0) return c.json({ error: 'not found' }, 404);
     return c.json({ ok: true });
   });
 
@@ -662,18 +590,32 @@ export function createApp(db: DB) {
     if (data.planPayments.some((p) => !planIds.has(p.planId))) {
       return c.json({ error: 'payment references unknown plan' }, 400);
     }
-    if (
-      data.subscriptions.some((s) => s.categoryId && !catIds.has(s.categoryId)) ||
-      data.templates.some((t) => t.categoryId && !catIds.has(t.categoryId)) ||
-      data.bills.some((b) => b.categoryId && !catIds.has(b.categoryId))
-    ) {
-      return c.json({ error: 'subscription/template/bill references unknown category' }, 400);
+    // legacy subscriptions become fixed-amount bills (subs→bills merge, v1.7.0)
+    const { subscriptions, ...rest } = data;
+    const bills = [
+      ...rest.bills,
+      ...subscriptions.map((s) => ({
+        id: s.id,
+        name: s.name,
+        amount: s.amount,
+        categoryId: s.categoryId,
+        description: s.description,
+        frequency: s.frequency,
+        anchorDate: s.firstBillDate,
+        intervalDays: null,
+        weekendRule: 'exact' as const,
+        endsOn: s.endsOn,
+        estimated: false,
+      })),
+    ];
+    if (bills.some((b) => b.categoryId && !catIds.has(b.categoryId))) {
+      return c.json({ error: 'bill references unknown category' }, 400);
     }
-    const billIds = new Set(data.bills.map((b) => b.id));
+    const billIds = new Set(bills.map((b) => b.id));
     if (data.billPayments.some((p) => !billIds.has(p.billId))) {
       return c.json({ error: 'bill payment references unknown bill' }, 400);
     }
-    replaceAll(db, data);
+    replaceAll(db, { ...rest, bills });
     return c.json({ ok: true });
   });
 

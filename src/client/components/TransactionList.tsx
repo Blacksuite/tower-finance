@@ -21,7 +21,6 @@ const TYPE_ICONS: Record<Transaction['type'], IconName> = {
 };
 
 const VIRTUAL_META: Record<VirtualKind, { icon: IconName; label: string; path: string }> = {
-  subscription: { icon: 'repeat', label: 'Subscription', path: '/subscriptions' },
   bill: { icon: 'wallet', label: 'Bill', path: '/bills' },
   plan: { icon: 'layers', label: 'Plan', path: '/plans' },
 };
@@ -44,7 +43,7 @@ function rowVisuals(tx: Transaction, categories: Map<string, Category>) {
   return { icon: TYPE_ICONS[tx.type], ...map };
 }
 
-/** Read-only row for a computed expense (subscription/bill/plan) — taps to its screen. */
+/** Read-only row for a computed expense (bill/plan) — taps to its screen. */
 function VirtualRow({ tx, categories }: { tx: VirtualExpense; categories: Map<string, Category> }) {
   const navigate = useNavigate();
   const v = rowVisuals(tx, categories);

@@ -39,29 +39,6 @@ export const DEFAULT_SETTINGS: Settings = {
   locale: 'nl-NL',
 };
 
-export type BillingFrequency = 'monthly' | 'quarterly' | 'yearly';
-
-export interface Subscription {
-  id: string;
-  name: string;
-  amount: number;
-  categoryId: string | null;
-  description: string;
-  firstBillDate: string; // YYYY-MM-DD anchor; subsequent bills step by frequency
-  frequency: BillingFrequency;
-  endsOn: string | null; // set when disabled so past cycles keep the expense
-}
-
-export interface ExpenseTemplate {
-  id: string;
-  name: string;
-  amount: number;
-  categoryId: string | null;
-  description: string;
-  frequency: BillingFrequency; // informational
-  defaultDay: number | null; // pre-fills the date field (clamped), else today
-}
-
 export type IncomeFrequency = 'monthly' | 'weekly' | 'biweekly' | 'four_weekly' | 'custom';
 
 export interface RecurringIncome {
@@ -130,8 +107,6 @@ export interface AppData {
   settings: Settings;
   plans: PaymentPlan[];
   planPayments: PlanPayment[];
-  subscriptions: Subscription[];
-  templates: ExpenseTemplate[];
   incomes: RecurringIncome[];
   bills: Bill[];
   billPayments: BillPayment[];
