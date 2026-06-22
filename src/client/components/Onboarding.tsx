@@ -12,6 +12,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { salaryDate } from '../../shared/cycles';
 import { configureFormat, currentMonthISO, fmtDate } from '../../shared/format';
 import { loadSampleData, useAddIncome, useAppData, useUpdateSettings } from '../api/data';
+import { CURRENCY_PRESETS, isPreset, presetKey } from '../currencyPresets';
 import { useToast } from './ui/Toast';
 
 const DISMISS_KEY = 'tower-onboarded';
@@ -45,8 +46,20 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
   const [weekendRule, setWeekendRule] = useState<'previous' | 'exact' | 'next'>(s?.weekendRule ?? 'exact');
   const [currency, setCurrency] = useState(s?.currency ?? 'EUR');
   const [locale, setLocale] = useState(s?.locale ?? 'nl-NL');
+  const [customLocale, setCustomLocale] = useState(() => !isPreset(currency, locale));
   const [salary, setSalary] = useState('');
   const [buffer, setBuffer] = useState(String(s?.safetyBuffer ?? 100));
+
+  const onPreset = (val: string) => {
+    if (val === 'other') {
+      setCustomLocale(true);
+      return;
+    }
+    const [cur, loc] = val.split('|');
+    setCurrency(cur);
+    setLocale(loc);
+    setCustomLocale(false);
+  };
 
   const dismiss = () => {
     localStorage.setItem(DISMISS_KEY, '1');
@@ -86,7 +99,8 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
         endsOn: null,
       });
     }
-    dismiss();
+    // setup committed — hand off to the 3-stop walkthrough (steps 3-5)
+    setStep(3);
   };
 
   const example = fmtDate(salaryDate(currentMonthISO(), { salaryDay, weekendRule }));
@@ -94,7 +108,7 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
   return (
     <div style={{ minHeight: '100dvh', display: 'grid', placeItems: 'center', padding: 20 }}>
       <div className="card qa-form" style={{ width: 'min(94vw, 440px)', gap: 18 }}>
-        <Dots step={step} />
+        <Dots step={step % 3} />
 
         {step === 0 && (
           <>
@@ -164,18 +178,36 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
         {step === 2 && (
           <>
             <h2 className="sheet__title" style={{ marginBottom: 0 }}>Your money & safety net</h2>
-            <div className="cluster">
-              <div className="field" style={{ maxWidth: 120 }}>
-                <label className="label" htmlFor="ob-currency">Currency</label>
-                <input id="ob-currency" className="input" maxLength={3} value={currency}
-                  onChange={(e) => setCurrency(e.target.value)} />
-              </div>
-              <div className="field" style={{ maxWidth: 140 }}>
-                <label className="label" htmlFor="ob-locale">Number format</label>
-                <input id="ob-locale" className="input" value={locale}
-                  onChange={(e) => setLocale(e.target.value)} />
-              </div>
+            <div className="field">
+              <label className="label" htmlFor="ob-currency-preset">Currency &amp; number format</label>
+              <select
+                id="ob-currency-preset"
+                className="input"
+                value={customLocale ? 'other' : presetKey(currency, locale)}
+                onChange={(e) => onPreset(e.target.value)}
+              >
+                {CURRENCY_PRESETS.map((p) => (
+                  <option key={presetKey(p.currency, p.locale)} value={presetKey(p.currency, p.locale)}>
+                    {p.label}
+                  </option>
+                ))}
+                <option value="other">Other (enter manually)…</option>
+              </select>
             </div>
+            {customLocale && (
+              <div className="cluster">
+                <div className="field" style={{ maxWidth: 120 }}>
+                  <label className="label" htmlFor="ob-currency">Currency (ISO 4217)</label>
+                  <input id="ob-currency" className="input" maxLength={3} placeholder="EUR" value={currency}
+                    onChange={(e) => setCurrency(e.target.value)} />
+                </div>
+                <div className="field" style={{ maxWidth: 140 }}>
+                  <label className="label" htmlFor="ob-locale">Number format (locale)</label>
+                  <input id="ob-locale" className="input" placeholder="nl-NL" value={locale}
+                    onChange={(e) => setLocale(e.target.value)} />
+                </div>
+              </div>
+            )}
             <div className="field">
               <label className="label" htmlFor="ob-salary">Monthly salary (optional)</label>
               <input id="ob-salary" className="input amount" type="number" inputMode="decimal"
@@ -194,8 +226,64 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
             </div>
           </>
         )}
+
+        {/* 3-stop post-setup walkthrough (steps 3-5) */}
+        {step === 3 && (
+          <WalkStop
+            title="This is your answer"
+            body="Your dashboard opens with one verdict: green means you're okay until payday, amber is tight, red means you'd fall short. The timeline right below shows what's coming — upcoming bills and your next paycheck."
+            onSkip={dismiss}
+            onNext={() => setStep(4)}
+          />
+        )}
+        {step === 4 && (
+          <WalkStop
+            title="Logging is one tap"
+            body="Tap the + button whenever you spend. Everything else — bills, plans, your payday verdict — updates automatically. The Transactions tab lists every entry, real and recurring."
+            onSkip={dismiss}
+            onNext={() => setStep(5)}
+          />
+        )}
+        {step === 5 && (
+          <WalkStop
+            title="That's all you need"
+            body={`Open Tower whenever you wonder "am I okay until payday?" — the answer is always right at the top.`}
+            onSkip={dismiss}
+            onNext={dismiss}
+            nextLabel="Get started"
+            last
+          />
+        )}
       </div>
     </div>
+  );
+}
+
+/** One stop in the post-setup walkthrough. Skip is available on every step. */
+function WalkStop({
+  title,
+  body,
+  onSkip,
+  onNext,
+  nextLabel = 'Next',
+  last = false,
+}: {
+  title: string;
+  body: string;
+  onSkip: () => void;
+  onNext: () => void;
+  nextLabel?: string;
+  last?: boolean;
+}) {
+  return (
+    <>
+      <h2 className="sheet__title" style={{ marginBottom: 0 }}>{title}</h2>
+      <p className="hint" style={{ lineHeight: 1.5 }}>{body}</p>
+      <div className="row row--between" style={{ marginTop: 'var(--space-1)' }}>
+        {last ? <span /> : <button type="button" className="btn btn--sm" onClick={onSkip}>Skip</button>}
+        <button type="button" className="btn btn--primary" onClick={onNext}>{nextLabel}</button>
+      </div>
+    </>
   );
 }
 

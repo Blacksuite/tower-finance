@@ -1,9 +1,13 @@
 import { useMemo, useState, type CSSProperties } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { upcomingView, type VerdictStatus } from '../../shared/upcoming';
-import { fmtDate, fmtEUR, todayISO } from '../../shared/format';
+import { upcomingTimeline, upcomingView, type VerdictStatus } from '../../shared/upcoming';
+import { fmtDate, fmtEUR, fmtSigned, todayISO } from '../../shared/format';
 import type { AppData } from '../../shared/types';
 import { EmptyState } from './ui/primitives';
+
+/** "today" / "tomorrow" / "in N days" for a relative day count. */
+const relDay = (days: number): string =>
+  days <= 0 ? 'today' : days === 1 ? 'tomorrow' : `in ${days} days`;
 
 const TIP_KEY = 'tower-tips-seen';
 
@@ -18,6 +22,7 @@ export function UpcomingCard({ data }: { data: AppData }) {
   const today = todayISO();
   const navigate = useNavigate();
   const v = useMemo(() => upcomingView(data, today), [data, today]);
+  const timeline = useMemo(() => upcomingTimeline(data, today), [data, today]);
   const [tipSeen, setTipSeen] = useState(() => {
     try {
       return localStorage.getItem(TIP_KEY) === '1';
@@ -99,33 +104,31 @@ export function UpcomingCard({ data }: { data: AppData }) {
           </div>
           <span className="hint">after upcoming bills</span>
         </div>
-        <div className="verdict-cols__bills">
-          <span className="label">
-            Bills before payday{v.bills.length > 0 ? ` · ${fmtEUR(v.billsTotal)}` : ''}
+      </div>
+
+      {/* mini timeline — the next few things that happen before payday */}
+      <div className="timeline">
+        <span className="label">What's coming</span>
+        {timeline.length === 0 ? (
+          <span className="hint" style={{ display: 'block', paddingTop: 6 }}>
+            Nothing due before payday.
           </span>
-          {v.bills.length === 0 ? (
-            <span className="hint" style={{ display: 'block', paddingTop: 6 }}>
-              No bills due before payday.
-            </span>
-          ) : (
-            v.bills.slice(0, 5).map((b) => (
-              <div
-                key={`${b.name}-${b.date}`}
-                className="budget-row__top"
-                style={{ padding: '5px 0' }}
-              >
-                <span className="budget-row__name">
-                  {b.name}
-                  <span style={{ color: 'var(--faint)' }}> · {fmtDate(b.date)}</span>
-                </span>
-                <span className="amount budget-row__amount">{fmtEUR(b.amount)}</span>
-              </div>
-            ))
-          )}
-          {v.bills.length > 5 && (
-            <span className="hint">+ {v.bills.length - 5} more before payday</span>
-          )}
-        </div>
+        ) : (
+          timeline.map((e) => (
+            <div key={`${e.kind}-${e.name}-${e.date}`} className="timeline__row">
+              <span
+                className="dot"
+                style={{ background: e.kind === 'income' ? 'var(--income)' : 'var(--expense)' }}
+                aria-hidden
+              />
+              <span className="timeline__name">{e.name}</span>
+              <span className="timeline__when hint">{relDay(e.daysUntil)}</span>
+              <span className={`amount timeline__amount amount--${e.kind === 'income' ? 'income' : 'expense'}`}>
+                {fmtSigned(e.amount, e.kind === 'income' ? '+' : '-')}
+              </span>
+            </div>
+          ))
+        )}
       </div>
     </section>
   );

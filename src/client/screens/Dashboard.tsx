@@ -45,8 +45,7 @@ export function Dashboard() {
 
   return (
     <div className="stack">
-      <div className="screen-head">
-        <h1 className="screen-title">Dashboard</h1>
+      <div className="screen-head" style={{ justifyContent: 'flex-end' }}>
         {/* tap the cycle date range to browse past cycles (Months) */}
         <button type="button" className="cycle-link" onClick={() => navigate('/months')}>
           {cycleText}

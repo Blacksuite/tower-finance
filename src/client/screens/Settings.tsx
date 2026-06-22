@@ -14,6 +14,7 @@ import {
   useUpdateCategory,
   useUpdateSettings,
 } from '../api/data';
+import { CURRENCY_PRESETS, isPreset, presetKey } from '../currencyPresets';
 import { IncomeManager } from '../components/IncomeManager';
 import { parseAmount } from '../components/QuickAdd';
 import { Icon } from '../components/ui/Icon';
@@ -36,59 +37,76 @@ export function Settings() {
 
   return (
     <div className="stack">
-      <div className="screen-head">
-        <h1 className="screen-title">Settings</h1>
-      </div>
+      <SettingsGroup title="Account" defaultOpen>
+        <Section title="Salary cycle">
+          <SalaryCycleForm />
+        </Section>
+        <Section title="Recurring income">
+          <IncomeManager incomes={data.incomes} />
+        </Section>
+        <Section title="Currency & locale">
+          <CurrencyForm />
+        </Section>
+        <Section title="Security">
+          <SecurityForm enabled={data.auth.enabled} />
+        </Section>
+      </SettingsGroup>
 
-      <Section title="Appearance">
-        <Segmented<ThemePref>
-          value={pref}
-          onChange={setPref}
-          options={[
-            { value: 'system', label: 'System' },
-            { value: 'light', label: 'Light' },
-            { value: 'dark', label: 'Dark' },
-          ]}
-          ariaLabel="Theme"
-        />
-      </Section>
+      <SettingsGroup title="Budgeting">
+        <Section title="Monthly targets">
+          <TargetsForm />
+        </Section>
+        <Section title="Categories & budgets">
+          <CategoryManager categories={data.categories} />
+        </Section>
+      </SettingsGroup>
 
-      <Section title="Salary cycle">
-        <SalaryCycleForm />
-      </Section>
-
-      <Section title="Recurring income">
-        <IncomeManager incomes={data.incomes} />
-      </Section>
-
-      <Section title="Monthly targets">
-        <TargetsForm />
-      </Section>
-
-      <Section title="Categories & budgets">
-        <CategoryManager categories={data.categories} />
-      </Section>
-
-      <Section title="Security">
-        <SecurityForm enabled={data.auth.enabled} />
-      </Section>
-
-      <Section title="Currency & locale">
-        <CurrencyForm />
-      </Section>
-
-      <Section title="Backup">
-        <BackupControls />
-      </Section>
-
-      <Section title="Sample data">
-        <SampleDataControls />
-      </Section>
+      <SettingsGroup title="Data & display">
+        <Section title="Appearance">
+          <Segmented<ThemePref>
+            value={pref}
+            onChange={setPref}
+            options={[
+              { value: 'system', label: 'System' },
+              { value: 'light', label: 'Light' },
+              { value: 'dark', label: 'Dark' },
+            ]}
+            ariaLabel="Theme"
+          />
+        </Section>
+        <Section title="Backup">
+          <BackupControls />
+        </Section>
+        <Section title="Sample data">
+          <SampleDataControls />
+        </Section>
+      </SettingsGroup>
 
       <span className="hint" style={{ textAlign: 'center' }}>
         Tower Finance v{__APP_VERSION__}
       </span>
     </div>
+  );
+}
+
+/** A collapsible group of related settings sections (native <details>). */
+function SettingsGroup({
+  title,
+  defaultOpen,
+  children,
+}: {
+  title: string;
+  defaultOpen?: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <details className="settings-group" open={defaultOpen}>
+      <summary className="settings-group__summary">
+        <Icon name="chevronRight" size={16} className="settings-group__chevron" />
+        <span>{title}</span>
+      </summary>
+      <div className="stack settings-group__body">{children}</div>
+    </details>
   );
 }
 
@@ -141,33 +159,69 @@ function CurrencyForm() {
   const update = useUpdateSettings();
   const [currency, setCurrency] = useState(data?.settings.currency ?? 'EUR');
   const [locale, setLocale] = useState(data?.settings.locale ?? 'nl-NL');
+  const [custom, setCustom] = useState(() =>
+    !isPreset(data?.settings.currency ?? 'EUR', data?.settings.locale ?? 'nl-NL'),
+  );
   if (!data) return null;
-  const commit = () => {
-    const cur = currency.trim().toUpperCase();
-    const loc = locale.trim();
+
+  // formatters are module-level, so changing them needs a reload to apply everywhere
+  const apply = (cur: string, loc: string) => {
     if (/^[A-Z]{3}$/.test(cur) && loc.length >= 2 &&
         (cur !== data.settings.currency || loc !== data.settings.locale)) {
       update.mutate({ currency: cur, locale: loc });
-      setTimeout(() => location.reload(), 350); // formatters are module-level; reload applies them everywhere
+      setTimeout(() => location.reload(), 350);
     }
   };
+  const commitManual = () => apply(currency.trim().toUpperCase(), locale.trim());
+  const onPreset = (val: string) => {
+    if (val === 'other') {
+      setCustom(true);
+      return;
+    }
+    const [cur, loc] = val.split('|');
+    setCurrency(cur);
+    setLocale(loc);
+    setCustom(false);
+    apply(cur, loc);
+  };
+
   return (
-    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16, alignItems: 'flex-end' }}>
-      <div className="field" style={{ maxWidth: 120 }}>
-        <label className="label" htmlFor="set-currency">Currency</label>
-        <input id="set-currency" className="input" value={currency} maxLength={3}
-          onChange={(e) => setCurrency(e.target.value)} onBlur={commit}
-          onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()} />
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+      <div className="field" style={{ maxWidth: 320 }}>
+        <label className="label" htmlFor="set-currency-preset">Currency &amp; number format</label>
+        <select
+          id="set-currency-preset"
+          className="input"
+          value={custom ? 'other' : presetKey(currency, locale)}
+          onChange={(e) => onPreset(e.target.value)}
+        >
+          {CURRENCY_PRESETS.map((p) => (
+            <option key={presetKey(p.currency, p.locale)} value={presetKey(p.currency, p.locale)}>
+              {p.label}
+            </option>
+          ))}
+          <option value="other">Other (enter manually)…</option>
+        </select>
       </div>
-      <div className="field" style={{ maxWidth: 140 }}>
-        <label className="label" htmlFor="set-locale">Locale</label>
-        <input id="set-locale" className="input" value={locale}
-          onChange={(e) => setLocale(e.target.value)} onBlur={commit}
-          onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()} />
-      </div>
-      <span className="hint" style={{ paddingBottom: 12 }}>
-        e.g. EUR + nl-NL → {fmtEUR(1234.56)}
-      </span>
+      {custom && (
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16, alignItems: 'flex-end' }}>
+          <div className="field" style={{ maxWidth: 120 }}>
+            <label className="label" htmlFor="set-currency">Currency</label>
+            <input id="set-currency" className="input" value={currency} maxLength={3}
+              onChange={(e) => setCurrency(e.target.value)} onBlur={commitManual}
+              onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()} />
+          </div>
+          <div className="field" style={{ maxWidth: 140 }}>
+            <label className="label" htmlFor="set-locale">Locale</label>
+            <input id="set-locale" className="input" value={locale}
+              onChange={(e) => setLocale(e.target.value)} onBlur={commitManual}
+              onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()} />
+          </div>
+          <span className="hint" style={{ paddingBottom: 12 }}>
+            e.g. EUR + nl-NL → {fmtEUR(1234.56)}
+          </span>
+        </div>
+      )}
     </div>
   );
 }

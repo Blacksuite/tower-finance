@@ -147,7 +147,7 @@ export function MonthView() {
             ariaLabel="Months view mode"
           />
         ) : (
-          <h1 className="screen-title">Months</h1>
+          <span />
         )}
         <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
           <div className="month-picker">

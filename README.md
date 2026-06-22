@@ -15,7 +15,8 @@
 
 Tower Finance answers one question, at a glance: **am I going to be okay until
 my next paycheck?** It opens with a single plain-language verdict — 🟢 okay,
-🟡 tight, or 🔴 trouble — and the detail sits quietly below.
+🟡 tight, or 🔴 trouble — followed by a short timeline of what's coming before
+payday. The rest of the detail sits quietly below.
 
 Most budget apps assume your month starts on the 1st. Real life starts when
 your salary lands — the 26th, the 25th, the last Friday before a weekend. Tower
@@ -24,9 +25,9 @@ income and the bills it pays always live in the same period.
 
 It's a single small Docker container with one SQLite file. No cloud, no bank
 logins, no accounts, no telemetry. Your financial data never leaves your
-server. First launch walks you through a 30-second setup (your payday, your
-salary, a safety buffer) and drops you on a working dashboard — or load the
-sample data with one tap to look around first.
+server. First launch walks you through a 30-second setup (your payday, currency,
+salary, a safety buffer), gives a quick three-stop tour, and drops you on a
+working dashboard — or load the sample data with one tap to look around first.
 
 **Who it's for:** self-hosters who want full manual control over their money
 picture — people replacing a spreadsheet, not chasing automatic bank sync.
@@ -62,24 +63,27 @@ automates the rest.
   Friday / exact / next Monday). Periods run payday to payday and are labeled
   by their real date range ("26 Jun – 25 Jul"). Default is plain calendar
   months if that's your thing.
-- **Insights trends** — income allocation and savings rate, bucketed by your pay
-  cycle so a paycheck lines up with the spending it funds (calendar months would
-  strand them apart when payday isn't the 1st). The Months page keeps a
-  calendar/cycle toggle for month-by-month reporting.
-- **Fast manual entry** — quick-add sheet with a numeric keypad, category chips
-  sorted by your usage, and reusable expense templates. Routine expense ≈ 3 taps.
-- **Subscriptions** — define them once (monthly/quarterly/yearly); they count
-  toward expenses and budgets automatically every cycle. Pausing keeps history.
+- **Insights with takeaways** — every section leads with a plain-language
+  summary ("Housing is your biggest expense at € 1.250", "You're saving 18% of
+  your income") above the chart, across this cycle / YTD / all time. Income
+  allocation and savings-rate trends are bucketed by your pay cycle so a paycheck
+  lines up with the spending it funds (calendar months would strand them apart
+  when payday isn't the 1st). The Months page keeps a calendar/cycle toggle.
+- **Fast manual entry** — quick-add sheet with a numeric keypad and category
+  chips sorted by your usage. Routine expense ≈ 3 taps.
+- **Bills** — every recurring or one-off expense (rent, utilities, streaming,
+  insurance) in one place, with a flexible cadence (weekly through yearly, or a
+  single due date) and optional variable amounts you can pin per charge. They
+  flow into expenses, budgets and the payday verdict automatically; pausing keeps
+  history.
 - **Payment plans** — installment purchases with an auto-scheduling cascade:
   override any month's payment (including 0 to skip) and the rest of the
   schedule reflows; the final installment self-adjusts.
-- **Budgets** — per-category budgets vs actuals as progress bars, monthly and
-  YTD (scaled by the cycles you actually used), plus savings/investment targets.
-- **Bills** — recurring or one-off expenses (rent, utilities, anything) with a
-  flexible cadence and optional variable amounts; they flow into expenses,
-  budgets and the payday verdict automatically.
-- **History & filters** — every transaction filterable by cycle, week, month,
-  year, custom range, category, and type.
+- **Budgets** — per-category budgets vs actuals as progress bars, scaled to the
+  range you're viewing, plus savings/investment targets.
+- **Transactions** — the full ledger (logged entries plus computed bill and plan
+  occurrences, so it reconciles with every total) filterable by cycle, week,
+  month, year, custom range, category, and type.
 - **Optional password protection** — scrypt-hashed password, httpOnly cookie
   sessions, login rate limiting, one-tap lock. Managed entirely in Settings; no
   environment variables. The API serves nothing without a valid session.

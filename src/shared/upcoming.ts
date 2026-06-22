@@ -38,6 +38,42 @@ export interface UpcomingView {
   status: VerdictStatus;
 }
 
+/** A single forward-looking event for the dashboard timeline. */
+export interface TimelineEvent {
+  kind: 'bill' | 'income';
+  name: string;
+  date: string;
+  amount: number; // always positive; the sign is implied by kind
+  daysUntil: number;
+}
+
+/**
+ * The next few things that happen before/at payday — upcoming bills plus the
+ * payday itself — chronological, capped at `limit`. Answers the natural
+ * follow-up to the verdict: "okay, but what's coming?"
+ */
+export function upcomingTimeline(data: AppData, today: string, limit = 5): TimelineEvent[] {
+  const v = upcomingView(data, today);
+  const events: TimelineEvent[] = v.bills.map((b) => ({
+    kind: 'bill',
+    name: b.name,
+    date: b.date,
+    amount: b.amount,
+    daysUntil: Math.max(0, daysBetween(today, b.date)),
+  }));
+  if (v.payday.amount !== null) {
+    events.push({
+      kind: 'income',
+      name: v.payday.name ?? 'Payday',
+      date: v.payday.date,
+      amount: v.payday.amount,
+      daysUntil: v.daysUntil,
+    });
+  }
+  events.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
+  return events.slice(0, limit);
+}
+
 export function upcomingView(data: AppData, today: string): UpcomingView {
   const s = data.settings;
   // recurring incomes are the source of truth for paydays; without any, the

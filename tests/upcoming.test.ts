@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { upcomingView } from '../src/shared/upcoming';
+import { upcomingTimeline, upcomingView } from '../src/shared/upcoming';
 import { DEFAULT_SETTINGS, type AppData, type Bill, type Settings, type Transaction } from '../src/shared/types';
 
 let id = 0;
@@ -116,6 +116,34 @@ describe('upcomingView', () => {
     });
     const v = upcomingView(d, '2026-06-13');
     expect(v.leftUntilPayday).toBe(3090); // 3200 − 110 (override, not the 80 estimate)
+  });
+});
+
+describe('upcomingTimeline', () => {
+  it('merges upcoming bills and payday, chronological with relative days', () => {
+    const d = data({ incomes: [salary], bills: [sub('Netflix', 15.99, '2026-01-20')] });
+    expect(upcomingTimeline(d, '2026-06-13')).toEqual([
+      { kind: 'bill', name: 'Netflix', date: '2026-06-20', amount: 15.99, daysUntil: 7 },
+      { kind: 'income', name: 'Salary', date: '2026-06-26', amount: 3200, daysUntil: 13 },
+    ]);
+  });
+
+  it('omits payday when its amount is unknown (no recurring income)', () => {
+    const d = data({
+      settings: { salaryDay: 26, weekendRule: 'previous' },
+      bills: [sub('Netflix', 15.99, '2026-01-20')],
+    });
+    expect(upcomingTimeline(d, '2026-06-13')).toEqual([
+      { kind: 'bill', name: 'Netflix', date: '2026-06-20', amount: 15.99, daysUntil: 7 },
+    ]);
+  });
+
+  it('caps at the limit', () => {
+    const bills = [
+      sub('A', 1, '2026-01-14'), sub('B', 1, '2026-01-15'),
+      sub('C', 1, '2026-01-16'), sub('D', 1, '2026-01-17'),
+    ];
+    expect(upcomingTimeline(data({ incomes: [salary], bills }), '2026-06-13', 3)).toHaveLength(3);
   });
 });
 

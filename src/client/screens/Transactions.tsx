@@ -94,10 +94,6 @@ export function Transactions() {
 
   return (
     <div className="stack">
-      <div className="screen-head">
-        <h1 className="screen-title">Transactions</h1>
-      </div>
-
       <div className="card" style={{ display: 'flex', flexWrap: 'wrap', gap: 12 }}>
         <div className="field" style={{ minWidth: 150, flex: 1 }}>
           <label className="label" htmlFor="h-period">Period</label>
