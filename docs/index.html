@@ -10,6 +10,8 @@
 <meta property="og:type" content="website" />
 <meta property="og:image" content="screenshots/dashboard.png" />
 <meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:site" content="@circuitoftmrw" />
+<meta name="twitter:creator" content="@circuitoftmrw" />
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
@@ -602,7 +604,7 @@
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9 12l2 2 4-4"/></svg>
         </div>
         <h3>The payday verdict</h3>
-        <p>🟢 okay, 🟡 tight, 🔴 trouble. The headline compares the money you have left this cycle against a safety buffer you set.</p>
+        <p>🟢 okay, 🟡 tight, 🔴 trouble. The headline weighs the money you have left this cycle against a safety buffer you set, then a short timeline shows what's coming before payday.</p>
       </div>
       <div class="feat">
         <div class="feat-icon">
@@ -622,15 +624,15 @@
         <div class="feat-icon">
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
         </div>
-        <h3>Bills, subs, plans</h3>
-        <p>Bills, subscriptions and payment plans all flow into the verdict automatically. Override any individual month when life is weird.</p>
+        <h3>Bills &amp; plans</h3>
+        <p>Every recurring or one-off bill — rent, utilities, streaming, insurance — plus installment plans flow into the verdict automatically. Override any single charge when life is weird.</p>
       </div>
       <div class="feat">
         <div class="feat-icon">
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20v-6M6 20V10M18 20V4"/></svg>
         </div>
         <h3>Insights without noise</h3>
-        <p>Top spending, budget vs actual, income allocation, savings rate. Each chart maps to a decision you'd actually make about next cycle.</p>
+        <p>Top spending, budget vs actual, income allocation, savings rate — each section opens with a plain-language takeaway, not just a chart. Switch between this cycle, year to date and all time.</p>
       </div>
       <div class="feat">
         <div class="feat-icon">
@@ -655,10 +657,11 @@
           by your pay cycle instead, so the numbers line up with the dashboard.
         </p>
         <ul>
+          <li>A plain-language takeaway leads every section</li>
           <li>Top spending categories with budget context</li>
-          <li>Income allocation: what % went where this cycle</li>
+          <li>Income allocation: what share went where</li>
           <li>Savings rate trend across cycles</li>
-          <li>Budget vs actual progress bars, monthly and YTD</li>
+          <li>Budget vs actual, across this cycle, YTD or all time</li>
         </ul>
       </div>
       <img src="screenshots/insights.png" alt="Insights screen showing top spending, allocation and savings rate" loading="lazy" />
@@ -674,17 +677,39 @@
         <span class="eyebrow">Months</span>
         <h3>Every cycle, side by side.</h3>
         <p>
-          Browse past cycles like pages in a journal. Income, expenses,
-          subscription charges, bill occurrences and plan installments are listed
-          for each cycle, in the period that actually paid them.
+          Tap the cycle date range on the dashboard to browse past cycles like
+          pages in a journal. Income, expenses, bill occurrences and plan
+          installments are listed for each cycle, in the period that actually
+          paid them.
         </p>
         <ul>
           <li>Cycle / calendar toggle for month-by-month reporting</li>
-          <li>Read-only virtual rows for recurring items (bills/subs/plans)</li>
-          <li>One-tap drill into any cycle's history</li>
+          <li>Read-only rows for recurring items (bills and plans)</li>
+          <li>One-tap drill into any cycle's transactions</li>
         </ul>
       </div>
     </div>
+  </div>
+</section>
+
+<section id="story">
+  <div class="wrap-narrow">
+    <span class="eyebrow">The story</span>
+    <h2 class="section-title">It started on a server called Tower.</h2>
+    <p class="section-lead" style="max-width:640px;">
+      Tower Finance is named after the machine it was born on: my home server,
+      "Tower", humming in the corner running everything else I self-host. I was
+      tired of budgeting apps that assume the month starts on the 1st, and tired
+      of patching the same spreadsheet every payday. So I built the thing I
+      actually wanted: one screen that tells me whether I'm okay until my next
+      paycheck, on hardware I own, with data that never leaves the house.
+    </p>
+    <p class="section-lead" style="max-width:640px; margin-bottom:0;">
+      It scratched my own itch first. If your money also lands on a schedule the
+      calendar ignores, maybe it'll scratch yours too. I build it in the open, so
+      follow along or say hi on
+      <a href="https://x.com/circuitoftmrw" style="color:var(--accent);">X (@circuitoftmrw)</a>.
+    </p>
   </div>
 </section>
 
@@ -710,7 +735,7 @@
         <div class="lbl">SQLite file you can copy anywhere</div>
       </div>
       <div class="trust-card">
-        <div class="num">MIT</div>
+        <div class="num">AGPL</div>
         <div class="lbl">Open source, audit the code yourself</div>
       </div>
     </div>
@@ -729,7 +754,7 @@
     <div class="steps">
       <div class="step">
         <h3>Pull the image</h3>
-        <p>Pre-built multi-arch container on GHCR. Pin a version or track <code>:latest</code>.</p>
+        <p>Pre-built container on GHCR. Pin a version or track <code>:latest</code>.</p>
       </div>
       <div class="step">
         <h3>Mount one volume</h3>
@@ -863,8 +888,9 @@
         </ul>
       </div>
       <div>
-        <h4>Support</h4>
+        <h4>Connect</h4>
         <ul>
+          <li><a href="https://x.com/circuitoftmrw">X / @circuitoftmrw</a></li>
           <li><a href="https://ko-fi.com/blacksuite">Ko-fi</a></li>
         </ul>
       </div>

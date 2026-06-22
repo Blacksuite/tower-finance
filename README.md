@@ -64,7 +64,7 @@ automates the rest.
   by their real date range ("26 Jun – 25 Jul"). Default is plain calendar
   months if that's your thing.
 - **Insights with takeaways** — every section leads with a plain-language
-  summary ("Housing is your biggest expense at € 1.250", "You're saving 18% of
+  summary ("Housing is your biggest expense at € 1.150", "You're saving 17% of
   your income") above the chart, across this cycle / YTD / all time. Income
   allocation and savings-rate trends are bucketed by your pay cycle so a paycheck
   lines up with the spending it funds (calendar months would strand them apart
